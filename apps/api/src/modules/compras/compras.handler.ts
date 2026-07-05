@@ -1,5 +1,6 @@
 import { FastifyRequest, FastifyReply } from 'fastify'
 import { Prisma } from '@prisma/client'
+import { Decimal } from '@prisma/client/runtime/library'
 import { validate } from '../../shared/validate'
 import { idParamSchema, periodoQuerySchema } from '../../shared/schemas'
 import { createCompraSchema } from './compras.schema'
@@ -48,12 +49,12 @@ export async function createCompraHandler(request: FastifyRequest, reply: Fastif
   const montoTotal = body.items.reduce((acc, i) => acc + i.cantidad * i.costo_unitario, 0)
 
   // Cabecera + detalle + incremento de existencias en una sola transacción
-  const compra = await prisma.$transaction(async (tx) => {
+  const compra = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     const nuevaCompra = await tx.compra.create({
       data: {
         proveedor_id: body.proveedor_id ?? null,
         proveedor_nombre: proveedorNombre,
-        monto_total: new Prisma.Decimal(montoTotal.toFixed(2)),
+        monto_total: new Decimal(montoTotal.toFixed(2)),
         fecha_hora: fechaHora,
         notas: body.notas ?? null,
         usuario_id: user.sub,
@@ -64,9 +65,9 @@ export async function createCompraHandler(request: FastifyRequest, reply: Fastif
       data: body.items.map((item) => ({
         compra_id: nuevaCompra.id,
         producto_id: item.producto_id,
-        cantidad: new Prisma.Decimal(item.cantidad),
-        costo_unitario: new Prisma.Decimal(item.costo_unitario.toFixed(2)),
-        total: new Prisma.Decimal((item.cantidad * item.costo_unitario).toFixed(2)),
+        cantidad: new Decimal(item.cantidad),
+        costo_unitario: new Decimal(item.costo_unitario.toFixed(2)),
+        total: new Decimal((item.cantidad * item.costo_unitario).toFixed(2)),
       })),
     })
 

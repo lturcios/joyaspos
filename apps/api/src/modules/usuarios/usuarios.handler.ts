@@ -1,6 +1,6 @@
 import { FastifyRequest, FastifyReply } from 'fastify'
 import bcrypt from 'bcryptjs'
-import { Prisma } from '@prisma/client'
+import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library'
 import { validate } from '../../shared/validate'
 import { idParamSchema } from '../../shared/schemas'
 import {
@@ -49,7 +49,7 @@ export async function createUsuarioHandler(request: FastifyRequest, reply: Fasti
     })
     return reply.status(201).send(usuario)
   } catch (error) {
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+    if (error instanceof PrismaClientKnownRequestError && error.code === 'P2002') {
       return reply.status(409).send({
         statusCode: 409,
         error: 'Conflict',

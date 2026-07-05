@@ -1,5 +1,6 @@
 import { FastifyRequest, FastifyReply } from 'fastify'
 import { Prisma } from '@prisma/client'
+import { Decimal, PrismaClientKnownRequestError } from '@prisma/client/runtime/library'
 import { validate } from '../../shared/validate'
 import { idParamSchema } from '../../shared/schemas'
 import {
@@ -28,12 +29,12 @@ export async function createProductoHandler(request: FastifyRequest, reply: Fast
       data: {
         nombre: body.nombre,
         unidad_medida: body.unidad_medida,
-        existencia: new Prisma.Decimal(body.existencia ?? 0),
+        existencia: new Decimal(body.existencia ?? 0),
       },
     })
     return reply.status(201).send({ ...producto, existencia: Number(producto.existencia) })
   } catch (error) {
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+    if (error instanceof PrismaClientKnownRequestError && error.code === 'P2002') {
       return reply.status(409).send({
         statusCode: 409,
         error: 'Conflict',
@@ -68,7 +69,7 @@ export async function updateProductoHandler(request: FastifyRequest, reply: Fast
     })
     return reply.send({ ...producto, existencia: Number(producto.existencia) })
   } catch (error) {
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+    if (error instanceof PrismaClientKnownRequestError && error.code === 'P2002') {
       return reply.status(409).send({
         statusCode: 409,
         error: 'Conflict',

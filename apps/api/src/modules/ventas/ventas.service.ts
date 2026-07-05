@@ -1,4 +1,5 @@
 import { PrismaClient, Prisma } from '@prisma/client'
+import { Decimal } from '@prisma/client/runtime/library'
 import type { CreateVentaInput, VentaSyncPayload } from './ventas.schema'
 import type { JwtPayload } from '@joyaspos/shared-types'
 
@@ -37,7 +38,7 @@ export async function registrarVenta(
     const venta = await tx.venta.create({
       data: {
         nombre_cliente: body.nombre_cliente ?? 'Clientes Varios',
-        monto_total: new Prisma.Decimal(montoTotal.toFixed(2)),
+        monto_total: new Decimal(montoTotal.toFixed(2)),
         fecha_hora: body.fecha_hora ? toDateTime(body.fecha_hora) : new Date(),
         usuario_id: user.sub,
       },
@@ -55,9 +56,9 @@ export async function registrarVenta(
             venta_id: venta.id,
             producto_id: item.producto_id,
             detalle,
-            cantidad: new Prisma.Decimal(item.cantidad),
-            precio_unitario: new Prisma.Decimal(item.precio_unitario.toFixed(2)),
-            total: new Prisma.Decimal(
+            cantidad: new Decimal(item.cantidad),
+            precio_unitario: new Decimal(item.precio_unitario.toFixed(2)),
+            total: new Decimal(
               (item.cantidad * item.precio_unitario).toFixed(2)
             ),
           },

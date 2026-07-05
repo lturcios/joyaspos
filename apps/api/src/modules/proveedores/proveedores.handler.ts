@@ -1,5 +1,5 @@
 import { FastifyRequest, FastifyReply } from 'fastify'
-import { Prisma } from '@prisma/client'
+import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library'
 import { validate } from '../../shared/validate'
 import { idParamSchema } from '../../shared/schemas'
 import { createProveedorSchema, updateProveedorSchema } from './proveedores.schema'
@@ -21,7 +21,7 @@ export async function createProveedorHandler(request: FastifyRequest, reply: Fas
     const proveedor = await request.server.prisma.proveedor.create({ data: body })
     return reply.status(201).send(proveedor)
   } catch (error) {
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+    if (error instanceof PrismaClientKnownRequestError && error.code === 'P2002') {
       return reply.status(409).send({
         statusCode: 409,
         error: 'Conflict',
