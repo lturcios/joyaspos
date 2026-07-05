@@ -1,0 +1,65 @@
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 40 38% 97%;
+    --foreground: 24 12% 14%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 24 12% 14%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 24 12% 14%;
+
+    --primary: 36 45% 41%;
+    --primary-foreground: 40 38% 97%;
+
+    --secondary: 24 14% 16%;
+    --secondary-foreground: 40 30% 94%;
+
+    --muted: 36 20% 92%;
+    --muted-foreground: 24 8% 42%;
+
+    --accent: 36 30% 90%;
+    --accent-foreground: 24 14% 16%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 36 18% 85%;
+    --input: 36 18% 85%;
+    --ring: 36 45% 41%;
+
+    --radius: 0.5rem;
+
+    --sidebar-background: 24 14% 14%;
+    --sidebar-foreground: 40 30% 92%;
+    --sidebar-primary: 36 50% 50%;
+    --sidebar-primary-foreground: 24 14% 10%;
+    --sidebar-accent: 24 12% 22%;
+    --sidebar-accent-foreground: 40 30% 92%;
+    --sidebar-border: 24 12% 24%;
+    --sidebar-ring: 36 50% 50%;
+
+    --status-success: 142 71% 35%;
+    --status-warning: 32 95% 44%;
+    --status-danger: 0 72% 51%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+  h1, h2, h3, h4 {
+    font-family: 'Playfair Display', serif;
+  }
+}

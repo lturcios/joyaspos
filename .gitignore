@@ -1,0 +1,41 @@
+# Claude Code internal artifacts
+.atl/
+
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build outputs
+dist/
+build/
+.next/
+out/
+
+# Environment
+.env
+.env.local
+.env.production
+
+# Turbo
+.turbo/
+
+# Android
+apps/mobile/.gradle/
+apps/mobile/build/
+apps/mobile/local.properties
+apps/mobile/keystore/
+*.apk
+*.aab
+
+# Logs
+*.log
+pnpm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+*.iml
+.vscode/settings.json
