@@ -5,9 +5,11 @@ import com.ltsoft.joyaspos.data.local.entity.VentaEntity
 import kotlinx.coroutines.flow.Flow
 
 interface VentaRepository {
-    suspend fun registrarVenta(venta: VentaEntity, items: List<VentaDetalleEntity>): Long
+    suspend fun registrarVenta(venta: VentaEntity, items: List<VentaDetalleEntity>, sucursalId: Long? = null): Long
     fun getVentasPorPeriodo(desde: String, hasta: String): Flow<List<VentaEntity>>
     fun countPendientes(): Flow<Int>
+    suspend fun countPendientesOnce(): Int
+    suspend fun clearAllTables()
     suspend fun getPendientes(): List<VentaEntity>
     suspend fun getVentaById(localId: Long): VentaEntity?
     suspend fun getDetallesByVentaId(ventaLocalId: Long): List<VentaDetalleEntity>

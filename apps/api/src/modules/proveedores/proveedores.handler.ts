@@ -3,10 +3,13 @@ import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library'
 import { validate } from '../../shared/validate'
 import { idParamSchema } from '../../shared/schemas'
 import { createProveedorSchema, updateProveedorSchema } from './proveedores.schema'
+import type { JwtPayload } from '@joyaspos/shared-types'
 
 export async function listProveedoresHandler(request: FastifyRequest, reply: FastifyReply) {
+  const user = request.user as JwtPayload
+
   const proveedores = await request.server.prisma.proveedor.findMany({
-    where: { activo: true },
+    where: { empresa_id: user.empresa_id, activo: true },
     orderBy: { nombre: 'asc' },
     select: { id: true, nombre: true, contacto: true, telefono: true, direccion: true, activo: true },
   })
@@ -17,15 +20,19 @@ export async function createProveedorHandler(request: FastifyRequest, reply: Fas
   const body = validate(createProveedorSchema, request.body, reply)
   if (!body) return
 
+  const user = request.user as JwtPayload
+
   try {
-    const proveedor = await request.server.prisma.proveedor.create({ data: body })
+    const proveedor = await request.server.prisma.proveedor.create({
+      data: { ...body, empresa_id: user.empresa_id },
+    })
     return reply.status(201).send(proveedor)
   } catch (error) {
     if (error instanceof PrismaClientKnownRequestError && error.code === 'P2002') {
       return reply.status(409).send({
         statusCode: 409,
         error: 'Conflict',
-        message: 'Ya existe un proveedor con ese nombre',
+        message: 'Ya existe un proveedor con ese nombre en tu empresa',
       })
     }
     throw error
@@ -38,8 +45,11 @@ export async function updateProveedorHandler(request: FastifyRequest, reply: Fas
   const body = validate(updateProveedorSchema, request.body, reply)
   if (!body) return
 
-  const existe = await request.server.prisma.proveedor.findFirst({
-    where: { id: params.id, activo: true },
+  const user = request.user as JwtPayload
+  const prisma = request.server.prisma
+
+  const existe = await prisma.proveedor.findFirst({
+    where: { id: params.id, empresa_id: user.empresa_id, activo: true },
   })
   if (!existe) {
     return reply.status(404).send({
@@ -49,7 +59,7 @@ export async function updateProveedorHandler(request: FastifyRequest, reply: Fas
     })
   }
 
-  const proveedor = await request.server.prisma.proveedor.update({
+  const proveedor = await prisma.proveedor.update({
     where: { id: params.id },
     data: body,
   })
@@ -60,8 +70,11 @@ export async function deleteProveedorHandler(request: FastifyRequest, reply: Fas
   const params = validate(idParamSchema, request.params, reply)
   if (!params) return
 
-  const existe = await request.server.prisma.proveedor.findFirst({
-    where: { id: params.id, activo: true },
+  const user = request.user as JwtPayload
+  const prisma = request.server.prisma
+
+  const existe = await prisma.proveedor.findFirst({
+    where: { id: params.id, empresa_id: user.empresa_id, activo: true },
   })
   if (!existe) {
     return reply.status(404).send({
@@ -71,7 +84,7 @@ export async function deleteProveedorHandler(request: FastifyRequest, reply: Fas
     })
   }
 
-  await request.server.prisma.proveedor.update({
+  await prisma.proveedor.update({
     where: { id: params.id },
     data: { activo: false },
   })

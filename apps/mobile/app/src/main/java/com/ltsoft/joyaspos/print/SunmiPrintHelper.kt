@@ -5,7 +5,6 @@ import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
 import android.graphics.BitmapFactory
-import android.graphics.drawable.BitmapDrawable
 import android.os.IBinder
 import android.os.RemoteException
 import android.util.Log
@@ -21,6 +20,7 @@ data class ReceiptData(
     val fecha: String,
     val cliente: String,
     val vendedor: String,
+    val sucursalNombre: String = "",   // branch name printed below logo
     val items: List<ReceiptItem>,
     val montoTotal: Double,
     val nombreNegocio: String = "JoyasPOS",
@@ -113,10 +113,15 @@ class SunmiPrintHelper @Inject constructor(
                 printerInit(null)
 
                 setAlignment(1, null)
-                // setFontSize(36f, null)
-                // printText("${data.nombreNegocio}\n", null)
                 val bitmap = BitmapFactory.decodeResource(context.resources, R.drawable.logo_to_print)
                 printBitmap(bitmap, null)
+
+                // Print branch name below logo when available
+                if (data.sucursalNombre.isNotBlank()) {
+                    setAlignment(1, null)
+                    setFontSize(26f, null)
+                    printText("${data.sucursalNombre}\n", null)
+                }
 
                 setFontSize(24f, null)
                 printText("================================\n", null)
@@ -128,7 +133,7 @@ class SunmiPrintHelper @Inject constructor(
                 setFontSize(26f, null)
                 printText("Venta  : ${data.ventaId}\n", null)
                 printText("Cliente: ${truncate(data.cliente, 20)}\n", null)
-                printText("Vendor : ${truncate(data.vendedor, 20)}\n", null)
+                printText("Usuari@: ${truncate(data.vendedor, 20)}\n", null)
                 setFontSize(24f, null)
                 printText("--------------------------------\n", null)
 
@@ -142,7 +147,7 @@ class SunmiPrintHelper @Inject constructor(
                 printText("--------------------------------\n", null)
                 setAlignment(1, null)
                 setFontSize(36f, null)
-                printText("TOTAL: \$${formatMonto(data.montoTotal)}\n", null)
+                printText("TOTAL: $${formatMonto(data.montoTotal)}\n", null)
 
                 setAlignment(1, null)
                 setFontSize(22f, null)
@@ -173,11 +178,12 @@ class SunmiPrintHelper @Inject constructor(
     private fun formatTableHeader(): String = "CANT DESCRIPCION       TOTAL\n"
 
     private fun formatItemLine(item: ReceiptItem): String {
-        val cantStr = "${item.cantidad}x".padEnd(4)
-        val totalStr = "\$${formatMonto(item.total)}".padStart(8)
-        val detalleMax = LINE_WIDTH - cantStr.length - totalStr.length - 1
+        val cantStr = "${item.cantidad}x".padEnd(6)
+        val unitarioStr = "$${formatMonto(item.precioUnitario)}".padStart(6)
+        val totalStr = "$${formatMonto(item.total)}".padStart(16)
+        val detalleMax = LINE_WIDTH - 1
         val detalle = truncate(item.detalle, detalleMax).padEnd(detalleMax)
-        return "$cantStr$detalle$totalStr\n"
+        return "$detalle\n$cantStr$unitarioStr$totalStr\n"
     }
 
     private fun formatMonto(monto: Double): String = "%.2f".format(monto)

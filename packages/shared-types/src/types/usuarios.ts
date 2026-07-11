@@ -13,6 +13,7 @@ export interface CreateUsuarioRequest {
   password: string
   nombre_completo: string
   rol: Rol
+  sucursal_id?: number  // required if rol === 'vendedor', validated in handler
 }
 
 export interface UpdateUsuarioRequest {
@@ -22,5 +23,5 @@ export interface UpdateUsuarioRequest {
 }
 
 export interface ChangePasswordRequest {
-  password: string  // mínimo 6 caracteres
+  password: string  // minimum 6 characters
 }

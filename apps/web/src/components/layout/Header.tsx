@@ -1,14 +1,15 @@
 import { Menu } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useAuthStore } from '@/stores/authStore'
+import { SucursalSelector } from './SucursalSelector'
 
 interface HeaderProps {
   onMenuClick: () => void
 }
 
 /**
- * Topbar — el boton hamburguesa SOLO es visible en mobile/tablet (<1024px);
- * en desktop el sidebar ya esta fijo y visible, asi que el boton no aplica.
+ * Topbar — hamburger button is only visible on mobile/tablet (<1024px);
+ * on desktop the sidebar is already fixed and visible.
  */
 export function Header({ onMenuClick }: HeaderProps) {
   const user = useAuthStore((s) => s.user)
@@ -30,9 +31,12 @@ export function Header({ onMenuClick }: HeaderProps) {
         </span>
       </div>
 
-      <span className="hidden text-sm text-muted-foreground sm:block">
-        {user?.nombre_completo}
-      </span>
+      <div className="flex items-center gap-4">
+        <SucursalSelector />
+        <span className="hidden text-sm text-muted-foreground sm:block">
+          {user?.nombre_completo}
+        </span>
+      </div>
     </header>
   )
 }

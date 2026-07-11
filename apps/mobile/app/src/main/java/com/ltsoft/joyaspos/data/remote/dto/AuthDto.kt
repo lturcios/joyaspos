@@ -12,7 +12,32 @@ data class UserDto(
     val username: String,
     @Json(name = "nombre_completo") val nombreCompleto: String,
     val rol: String,
+    @Json(name = "empresa_id") val empresaId: Long,
+    @Json(name = "sucursal_id") val sucursalId: Long?,       // null = admin
+    @Json(name = "sucursal_nombre") val sucursalNombre: String?,
 )
 
 @JsonClass(generateAdapter = true)
-data class LoginResponse(val token: String, val user: UserDto)
+data class EmpresaDto(
+    val id: Long,
+    val nombre: String,
+    val activo: Boolean,
+)
+
+@JsonClass(generateAdapter = true)
+data class SucursalDto(
+    val id: Long,
+    @Json(name = "empresa_id") val empresaId: Long,
+    val nombre: String,
+    val direccion: String? = null,
+    val telefono: String? = null,
+    val activo: Boolean,
+)
+
+@JsonClass(generateAdapter = true)
+data class LoginResponse(
+    val token: String,
+    val user: UserDto,
+    val empresa: EmpresaDto,
+    val sucursales: List<SucursalDto>,
+)

@@ -12,6 +12,14 @@ description: |
   Depende de SKILL-03 (fastify-project-structure) y SKILL-04 (prisma-mysql).
 ---
 
+> **⚠️ MULTITENANCY — LEER PRIMERO `skills/multitenancy-empresa-sucursal/SKILL.md`.**
+> Esta skill fue escrita antes del requisito multiempresa/multisucursal. La skill
+> de multitenancy define deltas OBLIGATORIOS que modifican el código de esta skill
+> (campos `empresa_id`/`sucursal_id`, JWT extendido, scoping por sucursal en todos
+> los queries, selector de sucursal, aislamiento de datos locales). Donde ambas
+> se contradigan, gana la skill de multitenancy.
+
+
 # SKILL-05 — Fastify Auth + JWT (apps/api)
 
 ## Stack

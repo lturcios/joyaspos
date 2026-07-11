@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { api } from '@/lib/axios'
 import { queryKeys } from '@/lib/queryKeys'
+import { useAuthStore } from '@/stores/authStore'
 import type {
   ReporteDashboard,
   ReporteVentas,
@@ -14,10 +15,13 @@ import type {
 type PeriodoParams = { desde: string; hasta: string }
 
 export function useDashboard() {
+  const sucursalId = useAuthStore((s) => s.sucursalActiva)
   return useQuery({
-    queryKey: queryKeys.reportes.dashboard(),
+    queryKey: queryKeys.reportes.dashboard(sucursalId),
     queryFn: async () => {
-      const { data } = await api.get<ReporteDashboard>('/reportes/dashboard')
+      const params: Record<string, unknown> = {}
+      if (sucursalId !== null && sucursalId !== undefined) params.sucursal_id = sucursalId
+      const { data } = await api.get<ReporteDashboard>('/reportes/dashboard', { params })
       return data
     },
     staleTime: 1000 * 60,
@@ -26,10 +30,13 @@ export function useDashboard() {
 }
 
 export function useReporteVentas(params: PeriodoParams) {
+  const sucursalId = useAuthStore((s) => s.sucursalActiva)
   return useQuery({
-    queryKey: queryKeys.reportes.ventas(params),
+    queryKey: queryKeys.reportes.ventas(params, sucursalId),
     queryFn: async () => {
-      const { data } = await api.get<ReporteVentas>('/reportes/ventas', { params })
+      const reqParams: Record<string, unknown> = { ...params }
+      if (sucursalId !== null && sucursalId !== undefined) reqParams.sucursal_id = sucursalId
+      const { data } = await api.get<ReporteVentas>('/reportes/ventas', { params: reqParams })
       return data
     },
     enabled: Boolean(params.desde && params.hasta),
@@ -37,10 +44,13 @@ export function useReporteVentas(params: PeriodoParams) {
 }
 
 export function useReporteProductosTop(params: PeriodoParams & { limit?: number }) {
+  const sucursalId = useAuthStore((s) => s.sucursalActiva)
   return useQuery({
-    queryKey: queryKeys.reportes.productosTop(params),
+    queryKey: queryKeys.reportes.productosTop(params, sucursalId),
     queryFn: async () => {
-      const { data } = await api.get<ReporteProductoTop[]>('/reportes/productos-top', { params })
+      const reqParams: Record<string, unknown> = { ...params }
+      if (sucursalId !== null && sucursalId !== undefined) reqParams.sucursal_id = sucursalId
+      const { data } = await api.get<ReporteProductoTop[]>('/reportes/productos-top', { params: reqParams })
       return data
     },
     enabled: Boolean(params.desde && params.hasta),
@@ -48,11 +58,14 @@ export function useReporteProductosTop(params: PeriodoParams & { limit?: number 
 }
 
 export function useReporteInventario(params: PeriodoParams) {
+  const sucursalId = useAuthStore((s) => s.sucursalActiva)
   return useQuery({
-    queryKey: queryKeys.reportes.inventario(params),
+    queryKey: queryKeys.reportes.inventario(params, sucursalId),
     queryFn: async () => {
+      const reqParams: Record<string, unknown> = { ...params }
+      if (sucursalId !== null && sucursalId !== undefined) reqParams.sucursal_id = sucursalId
       const { data } = await api.get<ReporteMovimientoProducto[]>('/reportes/inventario', {
-        params,
+        params: reqParams,
       })
       return data
     },
@@ -61,10 +74,13 @@ export function useReporteInventario(params: PeriodoParams) {
 }
 
 export function useReporteRentabilidad(params: PeriodoParams) {
+  const sucursalId = useAuthStore((s) => s.sucursalActiva)
   return useQuery({
-    queryKey: queryKeys.reportes.rentabilidad(params),
+    queryKey: queryKeys.reportes.rentabilidad(params, sucursalId),
     queryFn: async () => {
-      const { data } = await api.get<ReporteRentabilidad>('/reportes/rentabilidad', { params })
+      const reqParams: Record<string, unknown> = { ...params }
+      if (sucursalId !== null && sucursalId !== undefined) reqParams.sucursal_id = sucursalId
+      const { data } = await api.get<ReporteRentabilidad>('/reportes/rentabilidad', { params: reqParams })
       return data
     },
     enabled: Boolean(params.desde && params.hasta),
@@ -72,10 +88,13 @@ export function useReporteRentabilidad(params: PeriodoParams) {
 }
 
 export function useReporteCompras(params: PeriodoParams) {
+  const sucursalId = useAuthStore((s) => s.sucursalActiva)
   return useQuery({
-    queryKey: queryKeys.reportes.compras(params),
+    queryKey: queryKeys.reportes.compras(params, sucursalId),
     queryFn: async () => {
-      const { data } = await api.get<ReporteCompras>('/reportes/compras', { params })
+      const reqParams: Record<string, unknown> = { ...params }
+      if (sucursalId !== null && sucursalId !== undefined) reqParams.sucursal_id = sucursalId
+      const { data } = await api.get<ReporteCompras>('/reportes/compras', { params: reqParams })
       return data
     },
     enabled: Boolean(params.desde && params.hasta),

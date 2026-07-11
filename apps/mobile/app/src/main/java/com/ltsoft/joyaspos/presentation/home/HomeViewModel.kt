@@ -54,19 +54,31 @@ class HomeViewModel @Inject constructor(
         .map { it ?: "" }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "")
 
+    val sucursalNombre: StateFlow<String> = sessionPreferences
+        .getSessionData()
+        .map { it?.sucursalNombre ?: "" }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "")
+
+    val isAdmin: StateFlow<Boolean> = sessionPreferences
+        .getSessionData()
+        .map { it?.isAdmin == true }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
     fun onSearchQueryChange(query: String) {
         _searchQuery.value = query
     }
 
     fun refreshProductos() {
         viewModelScope.launch {
-            productoRepository.syncProductos(force = false)
+            val session = sessionPreferences.getSessionData().firstOrNull()
+            productoRepository.syncProductos(force = false, sucursalId = session?.sucursalId)
         }
     }
 
     fun forceRefreshProductos() {
         viewModelScope.launch {
-            productoRepository.syncProductos(force = true)
+            val session = sessionPreferences.getSessionData().firstOrNull()
+            productoRepository.syncProductos(force = true, sucursalId = session?.sucursalId)
         }
     }
 

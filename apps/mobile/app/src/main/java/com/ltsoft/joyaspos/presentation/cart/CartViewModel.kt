@@ -61,7 +61,10 @@ class CartViewModel @Inject constructor(
 
         viewModelScope.launch {
             _uiState.value = CartUiState.Submitting
-            val userId = sessionPreferences.getUserId().firstOrNull() ?: return@launch
+            val session = sessionPreferences.getSessionData().firstOrNull() ?: return@launch
+            val userId = session.userId
+            // Admin passes their selected sucursal_id; vendedor derives it from JWT server-side
+            val sucursalIdParaApi: Long? = if (session.isAdmin) session.sucursalId else null
             val fechaHora = LocalDateTime.now(ZoneId.of("America/El_Salvador")).toString()
             val cliente = _nombreCliente.value.trim().ifBlank { "Clientes Varios" }
 
@@ -84,7 +87,7 @@ class CartViewModel @Inject constructor(
                 )
             }
 
-            val localId = ventaRepository.registrarVenta(venta, detalles)
+            val localId = ventaRepository.registrarVenta(venta, detalles, sucursalIdParaApi)
             // Clear cart only after successful Room insert
             _items.value = emptyList()
             _nombreCliente.value = ""

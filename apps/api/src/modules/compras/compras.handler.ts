@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client'
 import { Decimal } from '@prisma/client/runtime/library'
 import { validate } from '../../shared/validate'
 import { idParamSchema, periodoQuerySchema } from '../../shared/schemas'
+import { sucursalWhere } from '../../shared/tenancy'
 import { createCompraSchema } from './compras.schema'
 import type { JwtPayload } from '@joyaspos/shared-types'
 
@@ -12,6 +13,10 @@ export async function createCompraHandler(request: FastifyRequest, reply: Fastif
 
   const user = request.user as JwtPayload
   const prisma = request.server.prisma
+
+  const sucursalId = await request.server.resolveSucursal(request, reply, { requerida: true })
+  if (sucursalId === undefined) return  // error already sent
+  const resolvedSucursalId = sucursalId as number
 
   const productoIds = body.items.map((i) => i.producto_id)
   const productos = await prisma.producto.findMany({
@@ -31,15 +36,16 @@ export async function createCompraHandler(request: FastifyRequest, reply: Fastif
 
   let proveedorNombre = body.proveedor_nombre?.trim() ?? ''
   if (body.proveedor_id) {
+    // Validate that the supplier belongs to the admin's company (not sucursal-scoped)
     const proveedor = await prisma.proveedor.findFirst({
-      where: { id: body.proveedor_id, activo: true },
+      where: { id: body.proveedor_id, empresa_id: user.empresa_id, activo: true },
       select: { nombre: true },
     })
     if (!proveedor) {
       return reply.status(400).send({
         statusCode: 400,
         error: 'Bad Request',
-        message: `Proveedor con id ${body.proveedor_id} no encontrado`,
+        message: `Proveedor con id ${body.proveedor_id} no encontrado en tu empresa`,
       })
     }
     proveedorNombre = proveedor.nombre
@@ -48,10 +54,11 @@ export async function createCompraHandler(request: FastifyRequest, reply: Fastif
   const fechaHora = body.fecha_hora ? new Date(body.fecha_hora) : new Date()
   const montoTotal = body.items.reduce((acc, i) => acc + i.cantidad * i.costo_unitario, 0)
 
-  // Cabecera + detalle + incremento de existencias en una sola transacción
+  // Header + detail + stock increment in a single transaction
   const compra = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     const nuevaCompra = await tx.compra.create({
       data: {
+        sucursal_id: resolvedSucursalId,
         proveedor_id: body.proveedor_id ?? null,
         proveedor_nombre: proveedorNombre,
         monto_total: new Decimal(montoTotal.toFixed(2)),
@@ -108,14 +115,24 @@ export async function listComprasHandler(request: FastifyRequest, reply: Fastify
   const query = validate(periodoQuerySchema, request.query, reply)
   if (!query) return
 
-  const compras = await request.server.prisma.compra.findMany({
+  const user = request.user as JwtPayload
+  const prisma = request.server.prisma
+
+  const sucursalId = await request.server.resolveSucursal(request, reply, { requerida: false })
+  if (sucursalId === undefined) return  // error already sent
+
+  const compras = await prisma.compra.findMany({
     where: {
       fecha_hora: {
         gte: new Date(`${query.desde}T00:00:00`),
         lte: new Date(`${query.hasta}T23:59:59`),
       },
+      ...sucursalWhere(sucursalId, user),
     },
-    include: { usuario: { select: { username: true } } },
+    include: {
+      usuario: { select: { username: true } },
+      sucursal: { select: { nombre: true } },
+    },
     orderBy: { fecha_hora: 'desc' },
   })
 
@@ -126,6 +143,7 @@ export async function listComprasHandler(request: FastifyRequest, reply: Fastify
       monto_total: Number(c.monto_total),
       fecha_hora: c.fecha_hora.toISOString(),
       registrado_por: c.usuario.username,
+      sucursal_nombre: c.sucursal.nombre,
     }))
   )
 }
@@ -134,10 +152,20 @@ export async function getCompraHandler(request: FastifyRequest, reply: FastifyRe
   const params = validate(idParamSchema, request.params, reply)
   if (!params) return
 
-  const compra = await request.server.prisma.compra.findUnique({
-    where: { id: params.id },
+  const user = request.user as JwtPayload
+  const prisma = request.server.prisma
+
+  // Ownership filter: vendedor → sucursal; admin → empresa
+  const ownershipWhere =
+    user.rol === 'vendedor'
+      ? { sucursal_id: user.sucursal_id! }
+      : { sucursal: { empresa_id: user.empresa_id } }
+
+  const compra = await prisma.compra.findFirst({
+    where: { id: params.id, ...ownershipWhere },
     include: {
       usuario: { select: { username: true } },
+      sucursal: { select: { nombre: true } },
       detalles: { include: { producto: { select: { nombre: true } } } },
     },
   })
@@ -158,6 +186,7 @@ export async function getCompraHandler(request: FastifyRequest, reply: FastifyRe
     fecha_hora: compra.fecha_hora.toISOString(),
     notas: compra.notas,
     registrado_por: compra.usuario.username,
+    sucursal_nombre: compra.sucursal.nombre,
     items: compra.detalles.map((d) => ({
       id: d.id,
       producto_id: d.producto_id,

@@ -29,6 +29,7 @@ import com.ltsoft.joyaspos.ui.theme.UnitBadgeText
 @Composable
 fun LoginScreen(
     onLoginSuccess: () -> Unit,
+    onAdminNeedsPicker: () -> Unit = {},
     onNavigateToSettings: () -> Unit = {},
     viewModel: LoginViewModel = hiltViewModel(),
 ) {
@@ -37,7 +38,11 @@ fun LoginScreen(
     var password by remember { mutableStateOf("") }
 
     LaunchedEffect(loginState) {
-        if (loginState is LoginUiState.Success) onLoginSuccess()
+        when (loginState) {
+            is LoginUiState.Success -> onLoginSuccess()
+            is LoginUiState.NeedsSucursalPicker -> onAdminNeedsPicker()
+            else -> Unit
+        }
     }
 
     Column(

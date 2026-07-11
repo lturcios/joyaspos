@@ -14,10 +14,12 @@ import {
   useUpdateUsuario,
   useChangePassword,
 } from '@/hooks/useUsuarios'
+import { useAuthStore } from '@/stores/authStore'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
+import { Rol } from '@joyaspos/shared-types'
 import type { Usuario } from '@joyaspos/shared-types'
 
 interface Props {
@@ -27,21 +29,64 @@ interface Props {
   usuario?: Usuario
 }
 
+// ---- Sucursal select (reused in create/edit) ----
+function SucursalField({
+  value,
+  onChange,
+  error,
+}: {
+  value: number | undefined
+  onChange: (id: number | undefined) => void
+  error?: string
+}) {
+  const sucursales = useAuthStore((s) => s.sucursales)
+  return (
+    <div className="space-y-1">
+      <Label htmlFor="sucursal_id">Sucursal *</Label>
+      <select
+        id="sucursal_id"
+        value={value ?? ''}
+        onChange={(e) => onChange(e.target.value === '' ? undefined : Number(e.target.value))}
+        className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+      >
+        <option value="">Selecciona una sucursal</option>
+        {sucursales.map((s) => (
+          <option key={s.id} value={s.id}>
+            {s.nombre}
+          </option>
+        ))}
+      </select>
+      {error && <p className="text-xs text-destructive">{error}</p>}
+    </div>
+  )
+}
+
 // ---- CREATE form ----
 function CreateForm({ onClose }: { onClose: () => void }) {
   const createMutation = useCreateUsuario()
   const {
     register,
     handleSubmit,
+    watch,
+    setValue,
     formState: { errors },
     reset,
   } = useForm<UsuarioFormValues>({ resolver: zodResolver(usuarioSchema) })
+
+  const rolValue = watch('rol')
+  const sucursalIdValue = watch('sucursal_id')
 
   const handleClose = () => { reset(); onClose() }
 
   const onSubmit = async (data: UsuarioFormValues) => {
     try {
-      await createMutation.mutateAsync(data)
+      await createMutation.mutateAsync({
+        username: data.username,
+        password: data.password,
+        nombre_completo: data.nombre_completo,
+        rol: data.rol,
+        sucursal_id: data.rol === Rol.VENDEDOR ? data.sucursal_id : undefined,
+      })
       toast.success('Usuario creado')
       handleClose()
     } catch (err: unknown) {
@@ -79,6 +124,15 @@ function CreateForm({ onClose }: { onClose: () => void }) {
         </select>
         {errors.rol && <p className="text-xs text-destructive">{errors.rol.message}</p>}
       </div>
+
+      {rolValue === Rol.VENDEDOR && (
+        <SucursalField
+          value={sucursalIdValue}
+          onChange={(id) => setValue('sucursal_id', id)}
+          error={errors.sucursal_id?.message}
+        />
+      )}
+
       <div className="flex justify-end gap-2">
         <Button type="button" variant="outline" onClick={handleClose} disabled={createMutation.isPending}>
           Cancelar
@@ -97,6 +151,8 @@ function EditForm({ usuario, onClose }: { usuario: Usuario; onClose: () => void 
   const {
     register,
     handleSubmit,
+    watch,
+    setValue,
     formState: { errors },
     reset,
   } = useForm<EditUsuarioFormValues>({
@@ -105,14 +161,26 @@ function EditForm({ usuario, onClose }: { usuario: Usuario; onClose: () => void 
       nombre_completo: usuario.nombre_completo,
       rol: usuario.rol,
       activo: usuario.activo,
+      sucursal_id: undefined,
     },
   })
+
+  const rolValue = watch('rol')
+  const sucursalIdValue = watch('sucursal_id')
 
   const handleClose = () => { reset(); onClose() }
 
   const onSubmit = async (data: EditUsuarioFormValues) => {
     try {
-      await updateMutation.mutateAsync({ id: usuario.id, body: data })
+      await updateMutation.mutateAsync({
+        id: usuario.id,
+        body: {
+          nombre_completo: data.nombre_completo,
+          rol: data.rol,
+          activo: data.activo,
+          sucursal_id: data.rol === Rol.VENDEDOR ? data.sucursal_id : undefined,
+        },
+      })
       toast.success('Usuario actualizado')
       handleClose()
     } catch (err: unknown) {
@@ -140,6 +208,15 @@ function EditForm({ usuario, onClose }: { usuario: Usuario; onClose: () => void 
         </select>
         {errors.rol && <p className="text-xs text-destructive">{errors.rol.message}</p>}
       </div>
+
+      {rolValue === Rol.VENDEDOR && (
+        <SucursalField
+          value={sucursalIdValue}
+          onChange={(id) => setValue('sucursal_id', id)}
+          error={errors.sucursal_id?.message}
+        />
+      )}
+
       <div className="flex items-center gap-2">
         <input
           id="activo"

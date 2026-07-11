@@ -2,6 +2,9 @@
 export * from './enums/roles'
 export * from './enums/periodos'
 
+// Entities
+export * from './entities/empresa'
+
 // Types
 export * from './types/auth'
 export * from './types/productos'

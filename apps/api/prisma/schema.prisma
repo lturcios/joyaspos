@@ -8,6 +8,47 @@ datasource db {
 }
 
 // ─────────────────────────────────────────────
+// EMPRESAS
+// ─────────────────────────────────────────────
+model Empresa {
+  id     Int     @id @default(autoincrement())
+  nombre String  @unique @db.VarChar(150)
+  activo Boolean @default(true)
+
+  sucursales  Sucursal[]
+  usuarios    Usuario[]
+  proveedores Proveedor[]
+
+  creado_en DateTime @default(now())
+
+  @@map("empresas")
+}
+
+// ─────────────────────────────────────────────
+// SUCURSALES
+// ─────────────────────────────────────────────
+model Sucursal {
+  id         Int     @id @default(autoincrement())
+  empresa_id Int
+  nombre     String  @db.VarChar(150)
+  direccion  String? @db.VarChar(255)
+  telefono   String? @db.VarChar(20)
+  activo     Boolean @default(true)
+
+  empresa   Empresa    @relation(fields: [empresa_id], references: [id])
+  usuarios  Usuario[]
+  productos Producto[]
+  ventas    Venta[]
+  compras   Compra[]
+
+  creado_en DateTime @default(now())
+
+  @@unique([empresa_id, nombre])
+  @@index([empresa_id], name: "idx_sucursales_empresa")
+  @@map("sucursales")
+}
+
+// ─────────────────────────────────────────────
 // USUARIOS
 // ─────────────────────────────────────────────
 model Usuario {
@@ -17,12 +58,19 @@ model Usuario {
   nombre_completo String?  @db.VarChar(100)
   rol             Rol      @default(vendedor)
   activo          Boolean  @default(true)
+  empresa_id      Int
+  sucursal_id     Int?
   created_at      DateTime @default(now())
   updated_at      DateTime @updatedAt
+
+  empresa  Empresa   @relation(fields: [empresa_id], references: [id])
+  sucursal Sucursal? @relation(fields: [sucursal_id], references: [id])
 
   ventas  Venta[]
   compras Compra[]
 
+  @@index([empresa_id],  name: "idx_usuarios_empresa")
+  @@index([sucursal_id], name: "idx_usuarios_sucursal")
   @@map("usuarios")
 }
 
@@ -36,16 +84,21 @@ enum Rol {
 // ─────────────────────────────────────────────
 model Producto {
   id            Int      @id @default(autoincrement())
-  nombre        String   @unique @db.VarChar(150)
+  sucursal_id   Int
+  nombre        String   @db.VarChar(150)
   unidad_medida String   @db.VarChar(30)
   existencia    Decimal  @default(0) @db.Decimal(10, 2)
   activo        Boolean  @default(true)
   created_at    DateTime @default(now())
   updated_at    DateTime @updatedAt
 
+  sucursal Sucursal @relation(fields: [sucursal_id], references: [id])
+
   venta_detalles  VentaDetalle[]
   compra_detalles CompraDetalle[]
 
+  @@unique([sucursal_id, nombre])
+  @@index([sucursal_id], name: "idx_productos_sucursal")
   @@map("productos")
 }
 
@@ -54,17 +107,20 @@ model Producto {
 // ─────────────────────────────────────────────
 model Venta {
   id             Int      @id @default(autoincrement())
+  sucursal_id    Int
   nombre_cliente String   @default("Clientes Varios") @db.VarChar(100)
   monto_total    Decimal  @db.Decimal(10, 2)
   fecha_hora     DateTime
   usuario_id     Int
   created_at     DateTime @default(now())
 
+  sucursal Sucursal       @relation(fields: [sucursal_id], references: [id])
   usuario  Usuario        @relation(fields: [usuario_id], references: [id])
   detalles VentaDetalle[]
 
-  @@index([fecha_hora], name: "idx_ventas_fecha")
-  @@index([usuario_id], name: "idx_ventas_usuario")
+  @@index([sucursal_id, fecha_hora], name: "idx_ventas_sucursal_fecha")
+  @@index([fecha_hora],              name: "idx_ventas_fecha")
+  @@index([usuario_id],              name: "idx_ventas_usuario")
   @@map("ventas")
 }
 
@@ -83,7 +139,7 @@ model VentaDetalle {
   venta    Venta    @relation(fields: [venta_id], references: [id], onDelete: Cascade)
   producto Producto @relation(fields: [producto_id], references: [id])
 
-  @@index([venta_id], name: "idx_venta_detalle_venta")
+  @@index([venta_id],    name: "idx_venta_detalle_venta")
   @@index([producto_id], name: "idx_venta_detalle_producto")
   @@map("venta_detalle")
 }
@@ -93,6 +149,7 @@ model VentaDetalle {
 // ─────────────────────────────────────────────
 model Proveedor {
   id         Int      @id @default(autoincrement())
+  empresa_id Int
   nombre     String   @db.VarChar(150)
   contacto   String?  @db.VarChar(100)
   telefono   String?  @db.VarChar(20)
@@ -101,8 +158,11 @@ model Proveedor {
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
 
+  empresa Empresa  @relation(fields: [empresa_id], references: [id])
   compras Compra[]
 
+  @@unique([empresa_id, nombre])
+  @@index([empresa_id], name: "idx_proveedores_empresa")
   @@map("proveedores")
 }
 
@@ -111,6 +171,7 @@ model Proveedor {
 // ─────────────────────────────────────────────
 model Compra {
   id               Int      @id @default(autoincrement())
+  sucursal_id      Int
   proveedor_id     Int?
   proveedor_nombre String   @db.VarChar(150)
   monto_total      Decimal  @db.Decimal(10, 2)
@@ -119,12 +180,14 @@ model Compra {
   usuario_id       Int
   created_at       DateTime @default(now())
 
+  sucursal  Sucursal        @relation(fields: [sucursal_id], references: [id])
   proveedor Proveedor?      @relation(fields: [proveedor_id], references: [id])
   usuario   Usuario         @relation(fields: [usuario_id], references: [id])
   detalles  CompraDetalle[]
 
-  @@index([fecha_hora], name: "idx_compras_fecha")
-  @@index([proveedor_id], name: "idx_compras_proveedor")
+  @@index([sucursal_id, fecha_hora], name: "idx_compras_sucursal_fecha")
+  @@index([fecha_hora],              name: "idx_compras_fecha")
+  @@index([proveedor_id],            name: "idx_compras_proveedor")
   @@map("compras")
 }
 
@@ -142,7 +205,7 @@ model CompraDetalle {
   compra   Compra   @relation(fields: [compra_id], references: [id], onDelete: Cascade)
   producto Producto @relation(fields: [producto_id], references: [id])
 
-  @@index([compra_id], name: "idx_compra_detalle_compra")
+  @@index([compra_id],   name: "idx_compra_detalle_compra")
   @@index([producto_id], name: "idx_compra_detalle_producto")
   @@map("compra_detalle")
 }

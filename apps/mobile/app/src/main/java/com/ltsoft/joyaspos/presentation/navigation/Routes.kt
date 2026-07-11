@@ -4,6 +4,7 @@ object Routes {
     const val SPLASH = "splash"
     const val LOGIN = "login"
     const val SETTINGS = "settings"
+    const val SUCURSAL_PICKER = "sucursal_picker"
     const val AUTHENTICATED = "authenticated"
     const val HOME = "home"
     const val CART = "cart"
@@ -15,4 +16,4 @@ object Routes {
     fun saleDetail(localId: Long) = "sale_detail/$localId"
 }
 
-enum class AuthStartupState { Loading, Authenticated, Unauthenticated, NotConfigured }
+enum class AuthStartupState { Loading, Authenticated, NeedsSucursalPicker, Unauthenticated, NotConfigured }

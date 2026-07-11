@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.ltsoft.joyaspos.data.local.entity.VentaDetalleEntity
 import com.ltsoft.joyaspos.data.local.entity.VentaEntity
+import com.ltsoft.joyaspos.data.local.preferences.SessionPreferences
 import com.ltsoft.joyaspos.domain.repository.VentaRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
@@ -23,6 +24,7 @@ sealed class SalesQueryUiState {
 @HiltViewModel
 class SalesQueryViewModel @Inject constructor(
     private val ventaRepository: VentaRepository,
+    private val sessionPreferences: SessionPreferences,
 ) : ViewModel() {
 
     private val _selectedPeriodo = MutableStateFlow("hoy")
@@ -33,6 +35,11 @@ class SalesQueryViewModel @Inject constructor(
 
     private val _selectedVentaDetalle = MutableStateFlow<List<VentaDetalleEntity>>(emptyList())
     val selectedVentaDetalle: StateFlow<List<VentaDetalleEntity>> = _selectedVentaDetalle
+
+    val esAdmin: StateFlow<Boolean> = sessionPreferences
+        .getSessionData()
+        .map { it?.isAdmin == true }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
     init {
         loadVentas("hoy")

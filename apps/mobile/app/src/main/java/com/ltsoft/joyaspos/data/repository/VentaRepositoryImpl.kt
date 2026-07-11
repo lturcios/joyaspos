@@ -2,9 +2,12 @@ package com.ltsoft.joyaspos.data.repository
 
 import android.content.Context
 import android.util.Log
+import com.ltsoft.joyaspos.data.local.JoyasDatabase
+import com.ltsoft.joyaspos.data.local.dao.ProductoDao
 import com.ltsoft.joyaspos.data.local.dao.VentaDao
 import com.ltsoft.joyaspos.data.local.entity.VentaDetalleEntity
 import com.ltsoft.joyaspos.data.local.entity.VentaEntity
+import com.ltsoft.joyaspos.data.local.preferences.SessionPreferences
 import com.ltsoft.joyaspos.data.remote.ApiService
 import com.ltsoft.joyaspos.data.remote.dto.SyncVentasRequest
 import com.ltsoft.joyaspos.data.remote.dto.VentaItemRequest
@@ -13,7 +16,10 @@ import com.ltsoft.joyaspos.data.remote.dto.toCreateVentaRequest
 import com.ltsoft.joyaspos.domain.repository.VentaRepository
 import com.ltsoft.joyaspos.worker.WorkManagerSetup
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.withContext
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -23,7 +29,10 @@ import javax.inject.Singleton
 @Singleton
 class VentaRepositoryImpl @Inject constructor(
     private val ventaDao: VentaDao,
+    private val productoDao: ProductoDao,
     private val apiService: ApiService,
+    private val database: JoyasDatabase,
+    private val sessionPreferences: SessionPreferences,
     @ApplicationContext private val context: Context,
 ) : VentaRepository {
 
@@ -35,16 +44,25 @@ class VentaRepositoryImpl @Inject constructor(
     // VentaRepositoryImpl is @Singleton so this flag resets only when the process dies.
     @Volatile private var historialDescargado = false
 
-    override suspend fun registrarVenta(venta: VentaEntity, items: List<VentaDetalleEntity>): Long {
+    override suspend fun registrarVenta(
+        venta: VentaEntity,
+        items: List<VentaDetalleEntity>,
+        sucursalId: Long?,
+    ): Long {
         // STEP 1: Always insert to Room first (offline-first)
         val localId = ventaDao.insertVenta(venta)
         val itemsConLocalId = items.map { it.copy(ventaLocalId = localId) }
         ventaDao.insertDetalles(itemsConLocalId)
         Log.d(TAG, "Venta insertada en Room: localId=$localId")
 
+        // STEP 1b: Decrement local stock immediately so the UI reflects it without waiting for sync
+        itemsConLocalId.forEach { item ->
+            productoDao.decrementarExistencia(productoId = item.productoId, cantidad = item.cantidad)
+        }
+
         // STEP 2: Attempt API sync
         try {
-            val request = venta.toCreateVentaRequest(itemsConLocalId)
+            val request = venta.toCreateVentaRequest(itemsConLocalId, sucursalId)
             val response = apiService.createVenta(request)
             if (response.isSuccessful) {
                 val remoteId = response.body()?.id
@@ -68,6 +86,12 @@ class VentaRepositoryImpl @Inject constructor(
 
     override fun countPendientes(): Flow<Int> = ventaDao.countPendientes()
 
+    override suspend fun countPendientesOnce(): Int = ventaDao.countPendientesOnce()
+
+    override suspend fun clearAllTables() {
+        withContext(Dispatchers.IO) { database.clearAllTables() }
+    }
+
     override suspend fun getPendientes(): List<VentaEntity> = ventaDao.getPendientesList()
 
     override suspend fun getVentaById(localId: Long): VentaEntity? = ventaDao.getById(localId)
@@ -90,14 +114,17 @@ class VentaRepositoryImpl @Inject constructor(
     override suspend fun uploadPendientes(): Boolean {
         val pendientes = ventaDao.getPendientesList()
         if (pendientes.isEmpty()) return true
+        // Resolve the sucursal_id for the current session once before processing the batch
+        val session = sessionPreferences.getSessionData().firstOrNull()
+        val sucursalIdParaApi: Long? = if (session?.isAdmin == true) session.sucursalId else null
         var todosExitosos = true
         pendientes.chunked(20).forEach { lote ->
-            if (!sincronizarLote(lote)) todosExitosos = false
+            if (!sincronizarLote(lote, sucursalIdParaApi)) todosExitosos = false
         }
         return todosExitosos
     }
 
-    private suspend fun sincronizarLote(lote: List<VentaEntity>): Boolean {
+    private suspend fun sincronizarLote(lote: List<VentaEntity>, sucursalIdParaApi: Long?): Boolean {
         return try {
             val payloads = lote.map { venta ->
                 val items = ventaDao.getDetallesByVentaId(venta.id)
@@ -105,6 +132,7 @@ class VentaRepositoryImpl @Inject constructor(
                     localId = venta.id,
                     nombreCliente = venta.nombreCliente,
                     fechaHora = normalizarFechaHora(venta.fechaHora),
+                    sucursalId = sucursalIdParaApi,
                     items = items.map { item ->
                         VentaItemRequest(
                             productoId = item.productoId,

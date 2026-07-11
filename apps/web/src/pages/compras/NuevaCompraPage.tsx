@@ -8,6 +8,7 @@ import { Plus, Trash2, ArrowLeft } from 'lucide-react'
 import { useCreateCompra } from '@/hooks/useCompras'
 import { useProductos } from '@/hooks/useProductos'
 import { useProveedores } from '@/hooks/useProveedores'
+import { useAuthStore } from '@/stores/authStore'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -36,6 +37,7 @@ export default function NuevaCompraPage() {
   const createCompra = useCreateCompra()
   const { data: productos } = useProductos()
   const { data: proveedores } = useProveedores()
+  const sucursalId = useAuthStore((s) => s.sucursalActiva)
 
   const [proveedorMode, setProveedorMode] = useState<'registrado' | 'libre'>('registrado')
 
@@ -65,6 +67,26 @@ export default function NuevaCompraPage() {
     return sum + q * c
   }, 0) ?? 0
 
+  // Guard: if no branch selected, show a message and prevent form submission
+  if (sucursalId === null) {
+    return (
+      <div className="mx-auto max-w-3xl space-y-6">
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="icon" onClick={() => navigate('/compras')}>
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <h1 className="text-2xl font-bold">Nueva compra</h1>
+        </div>
+        <p className="text-muted-foreground">
+          Selecciona una sucursal en el encabezado para registrar una compra.
+        </p>
+        <Button variant="outline" onClick={() => navigate('/compras')}>
+          Volver a compras
+        </Button>
+      </div>
+    )
+  }
+
   const onSubmit = async (data: CompraFormValues) => {
     try {
       const body = {
@@ -74,6 +96,7 @@ export default function NuevaCompraPage() {
             ? data.proveedor_nombre || null
             : proveedores?.find((p) => p.id === data.proveedor_id)?.nombre || null,
         notas: data.notas || null,
+        // sucursal_id is injected by the useCreateCompra hook from the store
         items: data.items.map((item) => ({
           producto_id: item.producto_id,
           cantidad: item.cantidad,

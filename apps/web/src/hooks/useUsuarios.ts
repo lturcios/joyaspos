@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/axios'
 import { queryKeys } from '@/lib/queryKeys'
+import { useAuthStore } from '@/stores/authStore'
 import type {
   Usuario,
   CreateUsuarioRequest,
@@ -9,10 +10,13 @@ import type {
 } from '@joyaspos/shared-types'
 
 export function useUsuarios() {
+  const sucursalId = useAuthStore((s) => s.sucursalActiva)
   return useQuery({
-    queryKey: queryKeys.usuarios.list(),
+    queryKey: queryKeys.usuarios.list(sucursalId),
     queryFn: async () => {
-      const { data } = await api.get<Usuario[]>('/usuarios')
+      const params: Record<string, unknown> = {}
+      if (sucursalId !== null && sucursalId !== undefined) params.sucursal_id = sucursalId
+      const { data } = await api.get<Usuario[]>('/usuarios', { params })
       return data
     },
   })
@@ -30,7 +34,7 @@ export function useCreateUsuario() {
 export function useUpdateUsuario() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ id, body }: { id: number; body: UpdateUsuarioRequest }) =>
+    mutationFn: ({ id, body }: { id: number; body: UpdateUsuarioRequest & { sucursal_id?: number } }) =>
       api.put<Usuario>(`/usuarios/${id}`, body).then((r) => r.data),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.usuarios.all }),
   })

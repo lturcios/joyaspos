@@ -47,7 +47,9 @@ class ConfirmationViewModel @Inject constructor(
                 return@launch
             }
             val items = ventaRepository.getDetallesByVentaId(venta.id)
-            val username = sessionPreferences.getUsername().firstOrNull() ?: ""
+            val session = sessionPreferences.getSessionData().firstOrNull()
+            val username = session?.username ?: ""
+            val sucursalNombre = session?.sucursalNombre ?: ""
 
             val ventaId = if (venta.remoteId != null) "#R-${venta.remoteId}"
                           else "#L-${venta.id}"
@@ -57,6 +59,7 @@ class ConfirmationViewModel @Inject constructor(
                 fecha = formatDateTime(venta.fechaHora),
                 cliente = venta.nombreCliente,
                 vendedor = username,
+                sucursalNombre = sucursalNombre,
                 items = items.map { item ->
                     ReceiptItem(
                         detalle = item.detalle,

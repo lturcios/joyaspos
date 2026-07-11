@@ -14,6 +14,14 @@ description: |
   y SKILL-14 (retrofit-okhttp-setup).
 ---
 
+> **⚠️ MULTITENANCY — LEER PRIMERO `skills/multitenancy-empresa-sucursal/SKILL.md`.**
+> Esta skill fue escrita antes del requisito multiempresa/multisucursal. La skill
+> de multitenancy define deltas OBLIGATORIOS que modifican el código de esta skill
+> (campos `empresa_id`/`sucursal_id`, JWT extendido, scoping por sucursal en todos
+> los queries, selector de sucursal, aislamiento de datos locales). Donde ambas
+> se contradigan, gana la skill de multitenancy.
+
+
 # SKILL-12 — Repository Pattern Offline-First (apps/mobile)
 
 ## Principio arquitectónico

@@ -3,6 +3,7 @@ import { env } from './config/env'
 import { prismaPlugin } from './plugins/prisma'
 import { authPlugin } from './plugins/auth'
 import { corsPlugin } from './plugins/cors'
+import { tenancyPlugin } from './plugins/tenancy'
 
 import { authRoutes } from './modules/auth/auth.routes'
 import { productosRoutes } from './modules/productos/productos.routes'
@@ -11,6 +12,7 @@ import { comprasRoutes } from './modules/compras/compras.routes'
 import { proveedoresRoutes } from './modules/proveedores/proveedores.routes'
 import { reportesRoutes } from './modules/reportes/reportes.routes'
 import { usuariosRoutes } from './modules/usuarios/usuarios.routes'
+import { sucursalesRoutes } from './modules/sucursales/sucursales.routes'
 
 export async function buildApp() {
   const app = Fastify({
@@ -26,6 +28,7 @@ export async function buildApp() {
   await app.register(corsPlugin)
   await app.register(prismaPlugin)
   await app.register(authPlugin)
+  await app.register(tenancyPlugin)   // must come after authPlugin
 
   app.setErrorHandler((error: FastifyError, _request, reply) => {
     const statusCode = error.statusCode ?? 500
@@ -40,13 +43,14 @@ export async function buildApp() {
     })
   })
 
-  await app.register(authRoutes, { prefix: '/auth' })
+  await app.register(authRoutes,      { prefix: '/auth' })
   await app.register(productosRoutes, { prefix: '/productos' })
-  await app.register(ventasRoutes, { prefix: '/ventas' })
-  await app.register(comprasRoutes, { prefix: '/compras' })
+  await app.register(ventasRoutes,    { prefix: '/ventas' })
+  await app.register(comprasRoutes,   { prefix: '/compras' })
   await app.register(proveedoresRoutes, { prefix: '/proveedores' })
-  await app.register(reportesRoutes, { prefix: '/reportes' })
-  await app.register(usuariosRoutes, { prefix: '/usuarios' })
+  await app.register(reportesRoutes,  { prefix: '/reportes' })
+  await app.register(usuariosRoutes,  { prefix: '/usuarios' })
+  await app.register(sucursalesRoutes, { prefix: '/sucursales' })
 
   app.get('/health', async () => ({ status: 'ok', timestamp: new Date().toISOString() }))
 

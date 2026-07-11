@@ -5,6 +5,6 @@ import kotlinx.coroutines.flow.Flow
 
 interface ProductoRepository {
     fun getProductos(): Flow<List<ProductoEntity>>
-    suspend fun syncProductos(force: Boolean = false): Boolean
+    suspend fun syncProductos(force: Boolean = false, sucursalId: Long? = null): Boolean
     fun resetSyncFlag()
 }

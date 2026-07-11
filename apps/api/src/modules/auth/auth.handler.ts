@@ -19,6 +19,10 @@ export async function loginHandler(request: FastifyRequest, reply: FastifyReply)
       password_hash: true,
       nombre_completo: true,
       rol: true,
+      empresa_id: true,
+      sucursal_id: true,
+      sucursal: { select: { nombre: true } },
+      empresa: { select: { id: true, nombre: true, activo: true } },
     },
   })
 
@@ -30,10 +34,32 @@ export async function loginHandler(request: FastifyRequest, reply: FastifyReply)
     })
   }
 
+  // Build JWT with tenant context
   const token = await reply.jwtSign({
     sub: usuario.id,
     username: usuario.username,
     rol: usuario.rol,
+    empresa_id: usuario.empresa_id,
+    sucursal_id: usuario.sucursal_id ?? null,
+  })
+
+  // Fetch branches visible to this user:
+  //   - admin → all active branches of the company
+  //   - vendedor → only their own branch
+  const sucursales = await prisma.sucursal.findMany({
+    where:
+      usuario.rol === 'vendedor' && usuario.sucursal_id
+        ? { id: usuario.sucursal_id, activo: true }
+        : { empresa_id: usuario.empresa_id, activo: true },
+    select: {
+      id: true,
+      empresa_id: true,
+      nombre: true,
+      direccion: true,
+      telefono: true,
+      activo: true,
+    },
+    orderBy: { nombre: 'asc' },
   })
 
   const response: LoginResponse = {
@@ -43,7 +69,16 @@ export async function loginHandler(request: FastifyRequest, reply: FastifyReply)
       username: usuario.username,
       nombre_completo: usuario.nombre_completo ?? usuario.username,
       rol: usuario.rol as Rol,
+      empresa_id: usuario.empresa_id,
+      sucursal_id: usuario.sucursal_id ?? null,
+      sucursal_nombre: usuario.sucursal?.nombre ?? null,
     },
+    empresa: {
+      id: usuario.empresa.id,
+      nombre: usuario.empresa.nombre,
+      activo: usuario.empresa.activo,
+    },
+    sucursales,
   }
 
   return reply.status(200).send(response)

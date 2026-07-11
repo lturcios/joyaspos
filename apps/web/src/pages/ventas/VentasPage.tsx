@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useVentas } from '@/hooks/useVentas'
+import { useAuthStore } from '@/stores/authStore'
 import { calcularPeriodo } from '@/lib/periodos'
 import { PeriodFilter } from '@/components/shared/PeriodFilter'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
@@ -14,6 +15,9 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import type { VentaResumen } from '@joyaspos/shared-types'
+
+type VentaResumenWithSucursal = VentaResumen & { sucursal_nombre?: string }
 
 type Periodo = 'hoy' | 'esta_semana' | 'esta_quincena' | 'este_mes' | 'personalizado'
 
@@ -26,8 +30,12 @@ export default function VentasPage() {
   const [customHasta, setCustomHasta] = useState('')
   const [selectedId, setSelectedId] = useState<number | null>(null)
 
+  const sucursalId = useAuthStore((s) => s.sucursalActiva)
+  const mostrarSucursal = sucursalId === null
+
   const rango = calcularPeriodo(periodo, { desde: customDesde, hasta: customHasta })
-  const { data: ventas, isLoading, isError, refetch } = useVentas(rango)
+  const { data, isLoading, isError, refetch } = useVentas(rango)
+  const ventas = data as VentaResumenWithSucursal[] | undefined
 
   const total = ventas?.reduce((sum, v) => sum + v.monto_total, 0) ?? 0
 
@@ -56,7 +64,7 @@ export default function VentasPage() {
             <span>Total: <strong className="text-foreground">{fmt(total)}</strong></span>
           </div>
 
-          {/* Tabla — md+ */}
+          {/* Table — md+ */}
           <div className="hidden md:block rounded-md border">
             <Table>
               <TableHeader>
@@ -64,6 +72,7 @@ export default function VentasPage() {
                   <TableHead>Fecha</TableHead>
                   <TableHead>Cliente</TableHead>
                   <TableHead>Vendedor</TableHead>
+                  {mostrarSucursal && <TableHead>Sucursal</TableHead>}
                   <TableHead className="text-right">Total</TableHead>
                 </TableRow>
               </TableHeader>
@@ -77,6 +86,7 @@ export default function VentasPage() {
                     <TableCell>{fmtDate(v.fecha_hora)}</TableCell>
                     <TableCell>{v.nombre_cliente}</TableCell>
                     <TableCell>{v.vendedor ?? '—'}</TableCell>
+                    {mostrarSucursal && <TableCell>{v.sucursal_nombre ?? '—'}</TableCell>}
                     <TableCell className="text-right font-medium">{fmt(v.monto_total)}</TableCell>
                   </TableRow>
                 ))}
@@ -99,6 +109,9 @@ export default function VentasPage() {
                 <p className="mt-1 font-medium truncate">{v.nombre_cliente}</p>
                 {v.vendedor && (
                   <p className="text-xs text-muted-foreground mt-0.5">Vendedor: {v.vendedor}</p>
+                )}
+                {mostrarSucursal && v.sucursal_nombre && (
+                  <p className="text-xs text-muted-foreground mt-0.5">Sucursal: {v.sucursal_nombre}</p>
                 )}
               </div>
             ))}

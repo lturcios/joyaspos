@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useProductos } from '@/hooks/useProductos'
+import { useAuthStore } from '@/stores/authStore'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { ErrorState } from '@/components/shared/ErrorState'
@@ -17,6 +18,9 @@ import {
 } from '@/components/ui/table'
 import { cn } from '@/lib/utils'
 import { BarChart2 } from 'lucide-react'
+import type { Producto } from '@joyaspos/shared-types'
+
+type ProductoWithSucursal = Producto & { sucursal_nombre?: string }
 
 const fmtCant = (n: number) => parseFloat(Number(n).toFixed(2)).toString()
 
@@ -27,11 +31,15 @@ function stockClass(n: number) {
 }
 
 export default function ExistenciasPage() {
-  const { data: productos, isLoading, isError, refetch } = useProductos()
+  const { data, isLoading, isError, refetch } = useProductos()
+  const sucursalId = useAuthStore((s) => s.sucursalActiva)
+  const mostrarSucursal = sucursalId === null
+
   const [search, setSearch] = useState('')
   const [kardexId, setKardexId] = useState<number | null>(null)
   const [kardexNombre, setKardexNombre] = useState<string | undefined>()
 
+  const productos = data as ProductoWithSucursal[] | undefined
   const activos = productos?.filter((p) => p.activo) ?? []
   const filtered = activos.filter((p) =>
     p.nombre.toLowerCase().includes(search.toLowerCase()),
@@ -68,7 +76,7 @@ export default function ExistenciasPage() {
         <EmptyState message="No se encontraron productos" />
       ) : (
         <>
-          {/* Tabla — md+ */}
+          {/* Table — md+ */}
           <div className="hidden md:block rounded-md border">
             <Table>
               <TableHeader>
@@ -76,6 +84,7 @@ export default function ExistenciasPage() {
                   <TableHead>Nombre</TableHead>
                   <TableHead>Unidad</TableHead>
                   <TableHead className="text-right">Existencia</TableHead>
+                  {mostrarSucursal && <TableHead>Sucursal</TableHead>}
                   <TableHead className="w-12" />
                 </TableRow>
               </TableHeader>
@@ -89,6 +98,7 @@ export default function ExistenciasPage() {
                         {fmtCant(p.existencia)}
                       </span>
                     </TableCell>
+                    {mostrarSucursal && <TableCell>{p.sucursal_nombre ?? '—'}</TableCell>}
                     <TableCell>
                       <Button
                         variant="ghost"
@@ -113,6 +123,9 @@ export default function ExistenciasPage() {
                   <div className="min-w-0">
                     <p className="font-medium truncate">{p.nombre}</p>
                     <p className="text-xs text-muted-foreground mt-0.5">{p.unidad_medida}</p>
+                    {mostrarSucursal && p.sucursal_nombre && (
+                      <p className="text-xs text-muted-foreground mt-0.5">{p.sucursal_nombre}</p>
+                    )}
                   </div>
                   <Button
                     variant="ghost"

@@ -9,7 +9,9 @@ interface ApiService {
     suspend fun login(@Body request: LoginRequest): Response<LoginResponse>
 
     @GET("productos")
-    suspend fun getProductos(): Response<List<ProductoDto>>
+    suspend fun getProductos(
+        @Query("sucursal_id") sucursalId: Long? = null,
+    ): Response<List<ProductoDto>>
 
     @POST("ventas")
     suspend fun createVenta(@Body request: CreateVentaRequest): Response<VentaResponse>

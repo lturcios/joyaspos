@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { toast } from 'sonner'
 import { Plus, MoreHorizontal } from 'lucide-react'
 import { useUsuarios, useDesactivarUsuario } from '@/hooks/useUsuarios'
+import { useAuthStore } from '@/stores/authStore'
 import { UsuarioFormDialog } from './UsuarioFormDialog'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 import { EmptyState } from '@/components/shared/EmptyState'
@@ -24,6 +25,8 @@ import {
 } from '@/components/ui/dropdown-menu'
 import type { Usuario } from '@joyaspos/shared-types'
 
+type UsuarioWithSucursal = Usuario & { sucursal_nombre?: string }
+
 type DialogMode = 'create' | 'edit' | 'password'
 
 interface DialogState {
@@ -33,8 +36,12 @@ interface DialogState {
 }
 
 export default function UsuariosPage() {
-  const { data: usuarios, isLoading, isError, refetch } = useUsuarios()
+  const { data, isLoading, isError, refetch } = useUsuarios()
   const desactivarMutation = useDesactivarUsuario()
+  const sucursalId = useAuthStore((s) => s.sucursalActiva)
+  const mostrarSucursal = sucursalId === null
+
+  const usuarios = data as UsuarioWithSucursal[] | undefined
 
   const [dialog, setDialog] = useState<DialogState>({
     open: false,
@@ -77,7 +84,7 @@ export default function UsuariosPage() {
         <EmptyState message="No hay usuarios registrados" />
       ) : (
         <>
-          {/* Tabla — md+ */}
+          {/* Table — md+ */}
           <div className="hidden md:block rounded-md border">
             <Table>
               <TableHeader>
@@ -86,6 +93,7 @@ export default function UsuariosPage() {
                   <TableHead>Nombre completo</TableHead>
                   <TableHead>Rol</TableHead>
                   <TableHead>Estado</TableHead>
+                  {mostrarSucursal && <TableHead>Sucursal</TableHead>}
                   <TableHead className="w-12" />
                 </TableRow>
               </TableHeader>
@@ -104,6 +112,7 @@ export default function UsuariosPage() {
                         {usuario.activo ? 'Activo' : 'Inactivo'}
                       </Badge>
                     </TableCell>
+                    {mostrarSucursal && <TableCell>{usuario.sucursal_nombre ?? '—'}</TableCell>}
                     <TableCell>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -145,6 +154,9 @@ export default function UsuariosPage() {
                     <p className="font-mono text-xs text-muted-foreground mt-0.5">
                       @{usuario.username}
                     </p>
+                    {mostrarSucursal && usuario.sucursal_nombre && (
+                      <p className="text-xs text-muted-foreground mt-0.5">{usuario.sucursal_nombre}</p>
+                    )}
                   </div>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>

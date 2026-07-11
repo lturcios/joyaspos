@@ -8,35 +8,80 @@ import {
   updateUsuarioSchema,
   changePasswordSchema,
 } from './usuarios.schema'
+import type { JwtPayload } from '@joyaspos/shared-types'
 
 export async function listUsuariosHandler(request: FastifyRequest, reply: FastifyReply) {
-  const usuarios = await request.server.prisma.usuario.findMany({
+  const user = request.user as JwtPayload
+  const prisma = request.server.prisma
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- raw query param not typed
+  const rawSucursalId = (request.query as any)?.sucursal_id
+  const sucursalFilter = rawSucursalId != null ? { sucursal_id: Number(rawSucursalId) } : {}
+
+  const usuarios = await prisma.usuario.findMany({
+    where: { empresa_id: user.empresa_id, ...sucursalFilter },
     select: {
       id: true,
       username: true,
       nombre_completo: true,
       rol: true,
       activo: true,
+      sucursal_id: true,
+      sucursal: { select: { nombre: true } },
       created_at: true,
     },
     orderBy: { username: 'asc' },
   })
-  return reply.send(usuarios)
+  return reply.send(
+    usuarios.map((u) => ({
+      ...u,
+      sucursal_nombre: u.sucursal?.nombre ?? null,
+      sucursal: undefined,
+    }))
+  )
 }
 
 export async function createUsuarioHandler(request: FastifyRequest, reply: FastifyReply) {
   const body = validate(createUsuarioSchema, request.body, reply)
   if (!body) return
 
+  const user = request.user as JwtPayload
+  const prisma = request.server.prisma
+
+  // Validate sucursal_id requirements
+  if (body.rol === 'vendedor') {
+    if (!body.sucursal_id) {
+      return reply.status(400).send({
+        statusCode: 400,
+        error: 'Bad Request',
+        message: 'sucursal_id es obligatorio para usuarios con rol vendedor',
+      })
+    }
+    // Confirm the branch belongs to the admin's company
+    const sucursal = await prisma.sucursal.findFirst({
+      where: { id: body.sucursal_id, empresa_id: user.empresa_id, activo: true },
+      select: { id: true },
+    })
+    if (!sucursal) {
+      return reply.status(400).send({
+        statusCode: 400,
+        error: 'Bad Request',
+        message: `Sucursal con id ${body.sucursal_id} no encontrada en tu empresa`,
+      })
+    }
+  }
+
   const password_hash = await bcrypt.hash(body.password, 12)
 
   try {
-    const usuario = await request.server.prisma.usuario.create({
+    const usuario = await prisma.usuario.create({
       data: {
         username: body.username,
         password_hash,
         nombre_completo: body.nombre_completo,
         rol: body.rol,
+        empresa_id: user.empresa_id,
+        sucursal_id: body.sucursal_id ?? null,
       },
       select: {
         id: true,
@@ -44,6 +89,7 @@ export async function createUsuarioHandler(request: FastifyRequest, reply: Fasti
         nombre_completo: true,
         rol: true,
         activo: true,
+        sucursal_id: true,
         created_at: true,
       },
     })
@@ -66,8 +112,12 @@ export async function updateUsuarioHandler(request: FastifyRequest, reply: Fasti
   const body = validate(updateUsuarioSchema, request.body, reply)
   if (!body) return
 
-  const existe = await request.server.prisma.usuario.findFirst({
-    where: { id: params.id },
+  const user = request.user as JwtPayload
+  const prisma = request.server.prisma
+
+  // Validate that the target user belongs to the admin's company
+  const existe = await prisma.usuario.findFirst({
+    where: { id: params.id, empresa_id: user.empresa_id },
   })
   if (!existe) {
     return reply.status(404).send({
@@ -77,7 +127,22 @@ export async function updateUsuarioHandler(request: FastifyRequest, reply: Fasti
     })
   }
 
-  const usuario = await request.server.prisma.usuario.update({
+  // If changing to vendedor and sucursal_id is provided, validate ownership
+  if (body.sucursal_id != null) {
+    const sucursal = await prisma.sucursal.findFirst({
+      where: { id: body.sucursal_id, empresa_id: user.empresa_id, activo: true },
+      select: { id: true },
+    })
+    if (!sucursal) {
+      return reply.status(400).send({
+        statusCode: 400,
+        error: 'Bad Request',
+        message: `Sucursal con id ${body.sucursal_id} no encontrada en tu empresa`,
+      })
+    }
+  }
+
+  const usuario = await prisma.usuario.update({
     where: { id: params.id },
     data: body,
     select: {
@@ -86,6 +151,7 @@ export async function updateUsuarioHandler(request: FastifyRequest, reply: Fasti
       nombre_completo: true,
       rol: true,
       activo: true,
+      sucursal_id: true,
     },
   })
   return reply.send(usuario)
@@ -95,8 +161,11 @@ export async function deleteUsuarioHandler(request: FastifyRequest, reply: Fasti
   const params = validate(idParamSchema, request.params, reply)
   if (!params) return
 
-  const existe = await request.server.prisma.usuario.findFirst({
-    where: { id: params.id, activo: true },
+  const user = request.user as JwtPayload
+  const prisma = request.server.prisma
+
+  const existe = await prisma.usuario.findFirst({
+    where: { id: params.id, empresa_id: user.empresa_id, activo: true },
   })
   if (!existe) {
     return reply.status(404).send({
@@ -106,7 +175,7 @@ export async function deleteUsuarioHandler(request: FastifyRequest, reply: Fasti
     })
   }
 
-  await request.server.prisma.usuario.update({
+  await prisma.usuario.update({
     where: { id: params.id },
     data: { activo: false },
   })
@@ -119,8 +188,11 @@ export async function changePasswordHandler(request: FastifyRequest, reply: Fast
   const body = validate(changePasswordSchema, request.body, reply)
   if (!body) return
 
-  const existe = await request.server.prisma.usuario.findFirst({
-    where: { id: params.id, activo: true },
+  const user = request.user as JwtPayload
+  const prisma = request.server.prisma
+
+  const existe = await prisma.usuario.findFirst({
+    where: { id: params.id, empresa_id: user.empresa_id, activo: true },
   })
   if (!existe) {
     return reply.status(404).send({
@@ -131,7 +203,7 @@ export async function changePasswordHandler(request: FastifyRequest, reply: Fast
   }
 
   const password_hash = await bcrypt.hash(body.password, 12)
-  await request.server.prisma.usuario.update({
+  await prisma.usuario.update({
     where: { id: params.id },
     data: { password_hash },
   })

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useReporteRentabilidad } from '@/hooks/useReportes'
+import { useAuthStore } from '@/stores/authStore'
 import { calcularPeriodo } from '@/lib/periodos'
 import { KpiCard } from '@/components/shared/KpiCard'
 import { PeriodFilter } from '@/components/shared/PeriodFilter'
@@ -31,12 +32,18 @@ export default function ReporteRentabilidadPage() {
   const [customDesde, setCustomDesde] = useState('')
   const [customHasta, setCustomHasta] = useState('')
 
+  const sucursales = useAuthStore((s) => s.sucursales)
+  const sucursalId = useAuthStore((s) => s.sucursalActiva)
+  const sucursalLabel = sucursalId !== null
+    ? (sucursales.find((s) => s.id === sucursalId)?.nombre ?? String(sucursalId))
+    : 'Todas las sucursales'
+
   const rango = calcularPeriodo(periodo, { desde: customDesde, hasta: customHasta })
   const { data, isLoading, isError, refetch } = useReporteRentabilidad(rango)
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold">Rentabilidad</h1>
+      <h1 className="text-2xl font-bold">Rentabilidad — {sucursalLabel}</h1>
 
       <PeriodFilter
         value={periodo}

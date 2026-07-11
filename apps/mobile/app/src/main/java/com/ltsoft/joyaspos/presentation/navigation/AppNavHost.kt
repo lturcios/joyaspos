@@ -24,6 +24,7 @@ import com.ltsoft.joyaspos.presentation.login.LoginViewModel
 import com.ltsoft.joyaspos.presentation.sales.SaleDetailScreen
 import com.ltsoft.joyaspos.presentation.sales.SalesQueryScreen
 import com.ltsoft.joyaspos.presentation.settings.ApiSettingsScreen
+import com.ltsoft.joyaspos.presentation.sucursal.SucursalPickerScreen
 
 @Composable
 fun AppNavHost(
@@ -56,6 +57,10 @@ fun AppNavHost(
                         navController.navigate(Routes.AUTHENTICATED) {
                             popUpTo(Routes.SPLASH) { inclusive = true }
                         }
+                    AuthStartupState.NeedsSucursalPicker ->
+                        navController.navigate(Routes.SUCURSAL_PICKER) {
+                            popUpTo(Routes.SPLASH) { inclusive = true }
+                        }
                     AuthStartupState.Unauthenticated ->
                         navController.navigate(Routes.LOGIN) {
                             popUpTo(Routes.SPLASH) { inclusive = true }
@@ -72,8 +77,8 @@ fun AppNavHost(
         composable(Routes.SETTINGS) {
             ApiSettingsScreen(
                 onSaved = {
-                    // Limpia el back stack completo y va a LOGIN — válido tanto en
-                    // primer arranque (sin historial) como al venir desde LOGIN.
+                    // Clear the full back stack and go to LOGIN — valid both on first launch
+                    // (no history) and when navigating from LOGIN.
                     navController.navigate(Routes.LOGIN) {
                         popUpTo(0) { inclusive = true }
                     }
@@ -83,15 +88,39 @@ fun AppNavHost(
 
         // ── LOGIN ─────────────────────────────────────────────────────────────
         composable(Routes.LOGIN) {
+            val loginViewModel: LoginViewModel = hiltViewModel()
             LoginScreen(
+                viewModel = loginViewModel,
                 onLoginSuccess = {
                     navController.navigate(Routes.AUTHENTICATED) {
+                        popUpTo(Routes.LOGIN) { inclusive = true }
+                    }
+                },
+                onAdminNeedsPicker = {
+                    navController.navigate(Routes.SUCURSAL_PICKER) {
                         popUpTo(Routes.LOGIN) { inclusive = true }
                     }
                 },
                 onNavigateToSettings = {
                     navController.navigate(Routes.SETTINGS)
                 },
+            )
+        }
+
+        // ── SUCURSAL_PICKER ───────────────────────────────────────────────────
+        // Entry points: (a) from SPLASH when admin session has no selected branch,
+        //               (b) from HOME via "Cambiar sucursal" menu item.
+        // In both cases, navigate to HOME with launchSingleTop=true so we don't
+        // accumulate duplicate HOME entries. Popping SUCURSAL_PICKER ensures the
+        // picker is removed from the back stack in both scenarios.
+        composable(Routes.SUCURSAL_PICKER) {
+            SucursalPickerScreen(
+                onSucursalSelected = {
+                    navController.navigate(Routes.HOME) {
+                        popUpTo(Routes.SUCURSAL_PICKER) { inclusive = true }
+                        launchSingleTop = true
+                    }
+                }
             )
         }
 
@@ -106,6 +135,9 @@ fun AppNavHost(
                     },
                     onNavigateToSalesQuery = {
                         navController.navigate(Routes.SALES_QUERY) { launchSingleTop = true }
+                    },
+                    onNavigateToCambiarSucursal = {
+                        navController.navigate(Routes.SUCURSAL_PICKER)
                     },
                     onLogout = {
                         navController.navigate(Routes.LOGIN) {

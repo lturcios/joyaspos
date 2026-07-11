@@ -26,6 +26,7 @@ const ReporteRentabilidadPage = lazy(
 const ReporteComprasPage = lazy(() => import('@/pages/reportes/compras/ReporteComprasPage'))
 const ExistenciasPage = lazy(() => import('@/pages/existencias/ExistenciasPage'))
 const UsuariosPage = lazy(() => import('@/pages/usuarios/UsuariosPage'))
+const SucursalesPage = lazy(() => import('@/pages/sucursales/SucursalesPage'))
 
 function withSuspense(Component: React.LazyExoticComponent<React.ComponentType<object>>) {
   return (
@@ -57,6 +58,7 @@ export const router = createBrowserRouter([
               { path: 'compras/nueva', element: withSuspense(NuevaCompraPage) },
               { path: 'existencias', element: withSuspense(ExistenciasPage) },
               { path: 'usuarios', element: withSuspense(UsuariosPage) },
+              { path: 'sucursales', element: withSuspense(SucursalesPage) },
               {
                 path: 'reportes',
                 element: withSuspense(ReportesLayout),

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { toast } from 'sonner'
 import { Plus, MoreHorizontal, BarChart2 } from 'lucide-react'
 import { useProductos, useDesactivarProducto } from '@/hooks/useProductos'
+import { useAuthStore } from '@/stores/authStore'
 import { ProductoFormDialog } from './ProductoFormDialog'
 import { KardexSheet } from '@/components/shared/KardexSheet'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
@@ -27,6 +28,8 @@ import {
 import { cn } from '@/lib/utils'
 import type { Producto } from '@joyaspos/shared-types'
 
+type ProductoWithSucursal = Producto & { sucursal_nombre?: string }
+
 const fmtCant = (n: number) => parseFloat(Number(n).toFixed(2)).toString()
 
 function stockClass(n: number) {
@@ -36,8 +39,12 @@ function stockClass(n: number) {
 }
 
 export default function ProductosPage() {
-  const { data: productos, isLoading, isError, refetch } = useProductos()
+  const { data, isLoading, isError, refetch } = useProductos()
   const desactivarMutation = useDesactivarProducto()
+  const sucursalId = useAuthStore((s) => s.sucursalActiva)
+  const mostrarSucursal = sucursalId === null
+
+  const productos = data as ProductoWithSucursal[] | undefined
 
   const [dialogOpen, setDialogOpen] = useState(false)
   const [selectedProducto, setSelectedProducto] = useState<Producto | undefined>()
@@ -72,7 +79,11 @@ export default function ProductosPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Productos</h1>
-        <Button onClick={handleNew}>
+        <Button
+          onClick={handleNew}
+          disabled={sucursalId === null}
+          title={sucursalId === null ? 'Selecciona una sucursal para crear registros' : undefined}
+        >
           <Plus className="mr-2 h-4 w-4" />
           Nuevo producto
         </Button>
@@ -82,7 +93,7 @@ export default function ProductosPage() {
         <EmptyState message="No hay productos registrados" />
       ) : (
         <>
-          {/* Tabla — md+ */}
+          {/* Table — md+ */}
           <div className="hidden md:block rounded-md border">
             <Table>
               <TableHeader>
@@ -91,6 +102,7 @@ export default function ProductosPage() {
                   <TableHead>Unidad</TableHead>
                   <TableHead className="text-right">Existencia</TableHead>
                   <TableHead>Estado</TableHead>
+                  {mostrarSucursal && <TableHead>Sucursal</TableHead>}
                   <TableHead className="w-12" />
                 </TableRow>
               </TableHeader>
@@ -109,6 +121,7 @@ export default function ProductosPage() {
                         {producto.activo ? 'Activo' : 'Inactivo'}
                       </Badge>
                     </TableCell>
+                    {mostrarSucursal && <TableCell>{producto.sucursal_nombre ?? '—'}</TableCell>}
                     <TableCell>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -154,6 +167,9 @@ export default function ProductosPage() {
                   <div className="min-w-0">
                     <p className="font-medium truncate">{producto.nombre}</p>
                     <p className="text-xs text-muted-foreground mt-0.5">{producto.unidad_medida}</p>
+                    {mostrarSucursal && producto.sucursal_nombre && (
+                      <p className="text-xs text-muted-foreground mt-0.5">{producto.sucursal_nombre}</p>
+                    )}
                   </div>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>

@@ -6,6 +6,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Receipt
@@ -34,6 +35,7 @@ fun HomeScreen(
     cartViewModel: CartViewModel,
     onNavigateToCart: () -> Unit,
     onNavigateToSalesQuery: () -> Unit,
+    onNavigateToCambiarSucursal: (() -> Unit)? = null,
     onLogout: () -> Unit,
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
@@ -41,6 +43,11 @@ fun HomeScreen(
     val pendingCount by viewModel.pendingCount.collectAsStateWithLifecycle()
     val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
     val itemCount by cartViewModel.itemCount.collectAsStateWithLifecycle()
+    val username by viewModel.username.collectAsStateWithLifecycle()
+    val sucursalNombre by viewModel.sucursalNombre.collectAsStateWithLifecycle()
+    val isAdmin by viewModel.isAdmin.collectAsStateWithLifecycle()
+
+    val titleText = if (sucursalNombre.isNotBlank()) "$sucursalNombre — $username" else username
 
     var selectedProducto by remember { mutableStateOf<ProductoEntity?>(null) }
     var showMenu by remember { mutableStateOf(false) }
@@ -75,7 +82,7 @@ fun HomeScreen(
             CenterAlignedTopAppBar(
                 title = {
                     Text(
-                        text = "JoyasPOS",
+                        text = if (titleText.isNotBlank()) titleText else "JoyasPOS",
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
                     )
@@ -99,6 +106,19 @@ fun HomeScreen(
                                     Icon(Icons.Default.Receipt, contentDescription = null)
                                 },
                             )
+                            if (isAdmin && onNavigateToCambiarSucursal != null) {
+                                DropdownMenuItem(
+                                    text = { Text("Cambiar sucursal") },
+                                    onClick = {
+                                        showMenu = false
+                                        onNavigateToCambiarSucursal()
+                                    },
+                                    leadingIcon = {
+                                        Icon(Icons.Default.LocationOn, contentDescription = null)
+                                    },
+                                )
+                                HorizontalDivider()
+                            }
                             DropdownMenuItem(
                                 text = { Text("Cerrar sesión") },
                                 onClick = {

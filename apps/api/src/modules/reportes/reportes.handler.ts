@@ -1,11 +1,20 @@
 import { FastifyRequest, FastifyReply } from 'fastify'
 import { validate } from '../../shared/validate'
 import { periodoQuerySchema } from '../../shared/schemas'
+import { sucursalWhere } from '../../shared/tenancy'
 import { z } from 'zod'
 import { parsePeriodo } from './reportes.util'
+import type { JwtPayload } from '@joyaspos/shared-types'
+import { Prisma } from '@prisma/client'
 
 export async function dashboardHandler(request: FastifyRequest, reply: FastifyReply) {
+  const user = request.user as JwtPayload
   const prisma = request.server.prisma
+
+  const sucursalId = await request.server.resolveSucursal(request, reply, { requerida: false })
+  if (sucursalId === undefined) return  // error already sent
+
+  const tenantFilter = sucursalWhere(sucursalId, user)
 
   const hoy = new Date()
   const inicioHoy = new Date(hoy.setHours(0, 0, 0, 0))
@@ -20,33 +29,46 @@ export async function dashboardHandler(request: FastifyRequest, reply: FastifyRe
   inicioSemana.setDate(inicioSemana.getDate() - ((inicioSemana.getDay() + 6) % 7))
   inicioSemana.setHours(0, 0, 0, 0)
 
+  // Build raw SQL tenant guard
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Prisma raw templating
+  const sucursalRawFilter: Prisma.Sql =
+    sucursalId != null
+      ? Prisma.sql`AND v.sucursal_id = ${sucursalId}`
+      : Prisma.sql`AND v.sucursal_id IN (SELECT id FROM sucursales WHERE empresa_id = ${user.empresa_id})`
+
+  const comprasSucursalRawFilter: Prisma.Sql =
+    sucursalId != null
+      ? Prisma.sql`AND c.sucursal_id = ${sucursalId}`
+      : Prisma.sql`AND c.sucursal_id IN (SELECT id FROM sucursales WHERE empresa_id = ${user.empresa_id})`
+
   const [ventasHoy, ventasAyer, ventasSemana, comprasSemana, stockBajo, topHoy] = await Promise.all([
     prisma.venta.aggregate({
-      where: { fecha_hora: { gte: inicioHoy, lte: finHoy } },
+      where: { fecha_hora: { gte: inicioHoy, lte: finHoy }, ...tenantFilter },
       _sum: { monto_total: true },
       _count: true,
     }),
     prisma.venta.aggregate({
-      where: { fecha_hora: { gte: inicioAyer, lte: finAyer } },
+      where: { fecha_hora: { gte: inicioAyer, lte: finAyer }, ...tenantFilter },
       _sum: { monto_total: true },
       _count: true,
     }),
     prisma.$queryRaw<Array<{ fecha: string; monto: number; cantidad: bigint }>>`
-      SELECT DATE(fecha_hora) as fecha,
-             SUM(monto_total) as monto,
+      SELECT DATE(v.fecha_hora) as fecha,
+             SUM(v.monto_total) as monto,
              COUNT(*) as cantidad
-      FROM ventas
-      WHERE fecha_hora >= ${inicioSemana}
-      GROUP BY DATE(fecha_hora)
+      FROM ventas v
+      WHERE v.fecha_hora >= ${inicioSemana}
+      ${sucursalRawFilter}
+      GROUP BY DATE(v.fecha_hora)
       ORDER BY fecha ASC
     `,
     prisma.compra.aggregate({
-      where: { fecha_hora: { gte: inicioSemana } },
+      where: { fecha_hora: { gte: inicioSemana }, ...sucursalWhere(sucursalId, user) },
       _sum: { monto_total: true },
       _count: true,
     }),
     prisma.producto.findMany({
-      where: { activo: true, existencia: { lte: 5 } },
+      where: { activo: true, existencia: { lte: 5 }, ...sucursalWhere(sucursalId, user) },
       select: { id: true, nombre: true, existencia: true },
       orderBy: { existencia: 'asc' },
       take: 10,
@@ -62,6 +84,7 @@ export async function dashboardHandler(request: FastifyRequest, reply: FastifyRe
       JOIN ventas v ON v.id = vd.venta_id
       JOIN productos p ON p.id = vd.producto_id
       WHERE v.fecha_hora >= ${inicioHoy} AND v.fecha_hora <= ${finHoy}
+      ${sucursalRawFilter}
       GROUP BY vd.producto_id, p.nombre
       ORDER BY monto_total DESC
       LIMIT 5
@@ -116,21 +139,35 @@ export async function reporteVentasHandler(request: FastifyRequest, reply: Fasti
   const periodo = parsePeriodo(request.query, reply)
   if (!periodo) return
 
+  const user = request.user as JwtPayload
   const prisma = request.server.prisma
+
+  const sucursalId = await request.server.resolveSucursal(request, reply, { requerida: false })
+  if (sucursalId === undefined) return  // error already sent
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Prisma raw templating
+  const sucursalRawFilter: Prisma.Sql =
+    sucursalId != null
+      ? Prisma.sql`AND v.sucursal_id = ${sucursalId}`
+      : Prisma.sql`AND v.sucursal_id IN (SELECT id FROM sucursales WHERE empresa_id = ${user.empresa_id})`
 
   const [agregado, porDia, porVendedor] = await Promise.all([
     prisma.venta.aggregate({
-      where: { fecha_hora: { gte: periodo.desde, lte: periodo.hasta } },
+      where: {
+        fecha_hora: { gte: periodo.desde, lte: periodo.hasta },
+        ...sucursalWhere(sucursalId, user),
+      },
       _sum: { monto_total: true },
       _count: true,
     }),
     prisma.$queryRaw<Array<{ fecha: string; monto: number; cantidad: bigint }>>`
-      SELECT DATE(fecha_hora) as fecha,
-             SUM(monto_total) as monto,
+      SELECT DATE(v.fecha_hora) as fecha,
+             SUM(v.monto_total) as monto,
              COUNT(*) as cantidad
-      FROM ventas
-      WHERE fecha_hora BETWEEN ${periodo.desde} AND ${periodo.hasta}
-      GROUP BY DATE(fecha_hora)
+      FROM ventas v
+      WHERE v.fecha_hora BETWEEN ${periodo.desde} AND ${periodo.hasta}
+      ${sucursalRawFilter}
+      GROUP BY DATE(v.fecha_hora)
       ORDER BY fecha ASC
     `,
     prisma.$queryRaw<
@@ -142,6 +179,7 @@ export async function reporteVentasHandler(request: FastifyRequest, reply: Fasti
       FROM ventas v
       JOIN usuarios u ON u.id = v.usuario_id
       WHERE v.fecha_hora BETWEEN ${periodo.desde} AND ${periodo.hasta}
+      ${sucursalRawFilter}
       GROUP BY v.usuario_id, u.username, u.nombre_completo
       ORDER BY monto DESC
     `,
@@ -181,10 +219,22 @@ export async function productosTopHandler(request: FastifyRequest, reply: Fastif
   const parsed = validate(schema, request.query, reply)
   if (!parsed) return
 
+  const user = request.user as JwtPayload
+  const prisma = request.server.prisma
+
+  const sucursalId = await request.server.resolveSucursal(request, reply, { requerida: false })
+  if (sucursalId === undefined) return  // error already sent
+
   const desde = new Date(`${parsed.desde}T00:00:00`)
   const hasta = new Date(`${parsed.hasta}T23:59:59`)
 
-  const resultados = await request.server.prisma.$queryRaw<
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Prisma raw templating
+  const sucursalRawFilter: Prisma.Sql =
+    sucursalId != null
+      ? Prisma.sql`AND v.sucursal_id = ${sucursalId}`
+      : Prisma.sql`AND v.sucursal_id IN (SELECT id FROM sucursales WHERE empresa_id = ${user.empresa_id})`
+
+  const resultados = await prisma.$queryRaw<
     Array<{ producto_id: number; nombre: string; cantidad_total: number; monto_total: number }>
   >`
     SELECT vd.producto_id,
@@ -195,6 +245,7 @@ export async function productosTopHandler(request: FastifyRequest, reply: Fastif
     JOIN ventas v ON v.id = vd.venta_id
     JOIN productos p ON p.id = vd.producto_id
     WHERE v.fecha_hora BETWEEN ${desde} AND ${hasta}
+    ${sucursalRawFilter}
     GROUP BY vd.producto_id, p.nombre
     ORDER BY monto_total DESC
     LIMIT ${parsed.limit}
@@ -220,10 +271,25 @@ export async function inventarioHandler(request: FastifyRequest, reply: FastifyR
   const periodo = parsePeriodo(request.query, reply)
   if (!periodo) return
 
+  const user = request.user as JwtPayload
   const prisma = request.server.prisma
 
+  const sucursalId = await request.server.resolveSucursal(request, reply, { requerida: false })
+  if (sucursalId === undefined) return  // error already sent
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Prisma raw templating
+  const ventasRawFilter: Prisma.Sql =
+    sucursalId != null
+      ? Prisma.sql`AND v.sucursal_id = ${sucursalId}`
+      : Prisma.sql`AND v.sucursal_id IN (SELECT id FROM sucursales WHERE empresa_id = ${user.empresa_id})`
+
+  const comprasRawFilter: Prisma.Sql =
+    sucursalId != null
+      ? Prisma.sql`AND c.sucursal_id = ${sucursalId}`
+      : Prisma.sql`AND c.sucursal_id IN (SELECT id FROM sucursales WHERE empresa_id = ${user.empresa_id})`
+
   const productos = await prisma.producto.findMany({
-    where: { activo: true },
+    where: { activo: true, ...sucursalWhere(sucursalId, user) },
     select: { id: true, nombre: true, existencia: true },
     orderBy: { nombre: 'asc' },
   })
@@ -234,6 +300,7 @@ export async function inventarioHandler(request: FastifyRequest, reply: FastifyR
       FROM compra_detalle cd
       JOIN compras c ON c.id = cd.compra_id
       WHERE c.fecha_hora BETWEEN ${periodo.desde} AND ${periodo.hasta}
+      ${comprasRawFilter}
       GROUP BY cd.producto_id
     `,
     prisma.$queryRaw<Array<{ producto_id: number; salidas: number }>>`
@@ -241,6 +308,7 @@ export async function inventarioHandler(request: FastifyRequest, reply: FastifyR
       FROM venta_detalle vd
       JOIN ventas v ON v.id = vd.venta_id
       WHERE v.fecha_hora BETWEEN ${periodo.desde} AND ${periodo.hasta}
+      ${ventasRawFilter}
       GROUP BY vd.producto_id
     `,
   ])
@@ -268,7 +336,22 @@ export async function rentabilidadHandler(request: FastifyRequest, reply: Fastif
   const periodo = parsePeriodo(request.query, reply)
   if (!periodo) return
 
+  const user = request.user as JwtPayload
   const prisma = request.server.prisma
+
+  const sucursalId = await request.server.resolveSucursal(request, reply, { requerida: false })
+  if (sucursalId === undefined) return  // error already sent
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Prisma raw templating
+  const ventasRawFilter: Prisma.Sql =
+    sucursalId != null
+      ? Prisma.sql`AND v.sucursal_id = ${sucursalId}`
+      : Prisma.sql`AND v.sucursal_id IN (SELECT id FROM sucursales WHERE empresa_id = ${user.empresa_id})`
+
+  const comprasRawFilter: Prisma.Sql =
+    sucursalId != null
+      ? Prisma.sql`AND c.sucursal_id = ${sucursalId}`
+      : Prisma.sql`AND c.sucursal_id IN (SELECT id FROM sucursales WHERE empresa_id = ${user.empresa_id})`
 
   const [ingresos, costos] = await Promise.all([
     prisma.$queryRaw<Array<{ producto_id: number; nombre: string; ingresos: number }>>`
@@ -277,6 +360,7 @@ export async function rentabilidadHandler(request: FastifyRequest, reply: Fastif
       JOIN ventas v ON v.id = vd.venta_id
       JOIN productos p ON p.id = vd.producto_id
       WHERE v.fecha_hora BETWEEN ${periodo.desde} AND ${periodo.hasta}
+      ${ventasRawFilter}
       GROUP BY vd.producto_id, p.nombre
     `,
     prisma.$queryRaw<Array<{ producto_id: number; costos: number }>>`
@@ -284,6 +368,7 @@ export async function rentabilidadHandler(request: FastifyRequest, reply: Fastif
       FROM compra_detalle cd
       JOIN compras c ON c.id = cd.compra_id
       WHERE c.fecha_hora BETWEEN ${periodo.desde} AND ${periodo.hasta}
+      ${comprasRawFilter}
       GROUP BY cd.producto_id
     `,
   ])
@@ -335,10 +420,17 @@ export async function kardexHandler(request: FastifyRequest, reply: FastifyReply
   const id = parseInt(productoId, 10)
   if (isNaN(id) || id <= 0) return reply.status(400).send({ message: 'ID de producto inválido' })
 
+  const user = request.user as JwtPayload
   const prisma = request.server.prisma
 
-  const producto = await prisma.producto.findUnique({
-    where: { id },
+  // Validate product belongs to the tenant
+  const ownershipWhere =
+    user.rol === 'vendedor'
+      ? { sucursal_id: user.sucursal_id! }
+      : { sucursal: { empresa_id: user.empresa_id } }
+
+  const producto = await prisma.producto.findFirst({
+    where: { id, ...ownershipWhere },
     select: { id: true, nombre: true, existencia: true, created_at: true },
   })
   if (!producto) return reply.status(404).send({ message: `Producto con id ${id} no encontrado` })
@@ -439,32 +531,47 @@ export async function reporteComprasHandler(request: FastifyRequest, reply: Fast
   const periodo = parsePeriodo(request.query, reply)
   if (!periodo) return
 
+  const user = request.user as JwtPayload
   const prisma = request.server.prisma
+
+  const sucursalId = await request.server.resolveSucursal(request, reply, { requerida: false })
+  if (sucursalId === undefined) return  // error already sent
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Prisma raw templating
+  const comprasRawFilter: Prisma.Sql =
+    sucursalId != null
+      ? Prisma.sql`AND c.sucursal_id = ${sucursalId}`
+      : Prisma.sql`AND c.sucursal_id IN (SELECT id FROM sucursales WHERE empresa_id = ${user.empresa_id})`
 
   const [agregado, porDia, porProveedor] = await Promise.all([
     prisma.compra.aggregate({
-      where: { fecha_hora: { gte: periodo.desde, lte: periodo.hasta } },
+      where: {
+        fecha_hora: { gte: periodo.desde, lte: periodo.hasta },
+        ...sucursalWhere(sucursalId, user),
+      },
       _sum: { monto_total: true },
       _count: true,
     }),
     prisma.$queryRaw<Array<{ fecha: string; monto: number; cantidad: bigint }>>`
-      SELECT DATE(fecha_hora) as fecha,
-             SUM(monto_total) as monto,
+      SELECT DATE(c.fecha_hora) as fecha,
+             SUM(c.monto_total) as monto,
              COUNT(*) as cantidad
-      FROM compras
-      WHERE fecha_hora BETWEEN ${periodo.desde} AND ${periodo.hasta}
-      GROUP BY DATE(fecha_hora)
+      FROM compras c
+      WHERE c.fecha_hora BETWEEN ${periodo.desde} AND ${periodo.hasta}
+      ${comprasRawFilter}
+      GROUP BY DATE(c.fecha_hora)
       ORDER BY fecha ASC
     `,
     prisma.$queryRaw<
       Array<{ proveedor_nombre: string; monto_total: number; cantidad_ordenes: bigint }>
     >`
-      SELECT proveedor_nombre,
-             SUM(monto_total) as monto_total,
+      SELECT c.proveedor_nombre,
+             SUM(c.monto_total) as monto_total,
              COUNT(*) as cantidad_ordenes
-      FROM compras
-      WHERE fecha_hora BETWEEN ${periodo.desde} AND ${periodo.hasta}
-      GROUP BY proveedor_nombre
+      FROM compras c
+      WHERE c.fecha_hora BETWEEN ${periodo.desde} AND ${periodo.hasta}
+      ${comprasRawFilter}
+      GROUP BY c.proveedor_nombre
       ORDER BY monto_total DESC
     `,
   ])

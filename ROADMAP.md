@@ -71,21 +71,35 @@ FASE 3 — Deploy (VPS API + VPS Web + APK Release)
 | Orden | Skill | Produce |
 |---|---|---|
 | 3 | `fastify-project-structure` (SKILL-03) | Estructura `apps/api/src/`, `app.ts`, `index.ts`, plugins (prisma, cors, auth), `config/env.ts`, `shared/errors.ts`, `tsconfig.json` |
-| 4 | `prisma-mysql` (SKILL-04) | `prisma/schema.prisma` completo, primera migración, índices MySQL |
+| 3b | `multitenancy-empresa-sucursal` (SKILL-00M) | **Leer ANTES de prisma-mysql.** Define tablas `empresas`/`sucursales`, campos `empresa_id`/`sucursal_id` en todos los modelos operativos, y las reglas de scoping que gobiernan TODO el resto del desarrollo |
+| 4 | `prisma-mysql` (SKILL-04) | `prisma/schema.prisma` completo **+ los deltas de SKILL-00M**, primera migración, índices MySQL |
 
 **Validar antes de continuar:**
 
 - [ ] `pnpm --filter api exec prisma generate` completa sin errores
 - [ ] `pnpm --filter api exec prisma migrate dev --name init` crea la BD y las tablas
 - [ ] `pnpm --filter api dev` arranca el servidor y `/health` retorna `{"status":"ok"}`
-- [ ] La BD tiene todas las tablas: `usuarios`, `productos`, `ventas`, `venta_detalle`, `proveedores`, `compras`, `compra_detalle`
-- [ ] Todos los índices del SRS están creados (verificar con `SHOW INDEX FROM ventas`)
+- [ ] La BD tiene todas las tablas: `empresas`, `sucursales`, `usuarios`, `productos`, `ventas`, `venta_detalle`, `proveedores`, `compras`, `compra_detalle`
+- [ ] `usuarios` tiene `empresa_id` (NOT NULL) y `sucursal_id` (nullable); `productos`/`proveedores`/`ventas`/`compras` tienen `sucursal_id` NOT NULL
+- [ ] Los uniques compuestos existen: `(sucursal_id, nombre)` en productos y proveedores; `(empresa_id, nombre)` en sucursales
+- [ ] Todos los índices del SRS + `idx_ventas_sucursal_fecha` + `idx_compras_sucursal_fecha` están creados
 
-### 0.3 — Proyecto Android
+### 0.3 — Sistema de diseño (marca compartida)
 
 | Orden | Skill | Produce |
 |---|---|---|
-| 5 | `android-project-structure` (SKILL-10) | Proyecto Gradle completo en `apps/mobile/`, `libs.versions.toml`, `build.gradle.kts`, `AndroidManifest.xml`, `JoyasApp.kt`, `MainActivity.kt`, estructura de paquetes |
+| 5 | `design-system` (SKILL-00D) | Definición de la paleta de marca (dorado antiguo + carbón + marfil) y tipografía, compartida entre Web y Mobile. **Ejecutar antes de 0.4 y 0.5** — ambas skills dependen de esta. |
+
+**Validar antes de continuar:**
+
+- [ ] La paleta está clara: 1 color primario (dorado), 1 secundario (carbón), colores de estado separados (verde/ámbar/rojo/naranja)
+- [ ] No es la paleta azul/morada genérica de un dashboard SaaS — debe sentirse "joyería"
+
+### 0.4 — Proyecto Android
+
+| Orden | Skill | Produce |
+|---|---|---|
+| 6 | `android-project-structure` (SKILL-10) | Proyecto Gradle completo en `apps/mobile/`, `libs.versions.toml`, `build.gradle.kts`, `AndroidManifest.xml`, `JoyasApp.kt`, `MainActivity.kt`, estructura de paquetes |
 
 **Validar antes de continuar:**
 
@@ -95,16 +109,20 @@ FASE 3 — Deploy (VPS API + VPS Web + APK Release)
 - [ ] `build.gradle.kts` tiene `kapt { arguments { arg("room.schemaLocation", ...) } }`
 - [ ] `local.properties` tiene `API_BASE_URL` configurado
 
-### 0.4 — Proyecto Web
+> **Nota:** `Theme.kt`/`Type.kt` con la paleta de marca se implementan en
+> SKILL-16 (`compose-ui-sunmi`, Fase 1B), pero el contenido exacto ya está
+> definido en SKILL-00D desde este punto.
+
+### 0.5 — Proyecto Web
 
 | Orden | Skill | Produce |
 |---|---|---|
-| 6 | `react-project-structure` (SKILL-21) | Proyecto Vite en `apps/web/`, `App.tsx`, `main.tsx`, `lib/axios.ts`, `lib/queryClient.ts`, `lib/utils.ts`, `lib/periodos.ts`, layout base con Tailwind + shadcn/ui |
+| 7 | `react-project-structure` (SKILL-21) | Proyecto Vite en `apps/web/`, `App.tsx`, `main.tsx`, `lib/axios.ts`, `lib/queryClient.ts`, `lib/utils.ts`, `lib/periodos.ts`, `src/index.css` (variables CSS de marca — **crítico**, ver SKILL-00D), `tailwind.config.ts`, `components.json` |
 
 **Validar antes de continuar:**
 
 - [ ] `pnpm --filter web dev` arranca Vite sin errores
-- [ ] La página en blanco renderiza correctamente en `http://localhost:5173`
+- [ ] **Verificación visual obligatoria:** abrir `http://localhost:5173` — el fondo debe verse marfil (no blanco puro) y cualquier botón de shadcn/ui debe verse dorado, no gris/sin estilo. Si se ve blanco y negro, `src/index.css` no tiene el contenido de SKILL-00D o no está importado en `main.tsx`.
 - [ ] `pnpm --filter web build` produce `dist/` sin errores de TypeScript
 - [ ] `@joyaspos/shared-types` es importable desde el código del panel web
 
@@ -118,7 +136,8 @@ FASE 3 — Deploy (VPS API + VPS Web + APK Release)
 ║  □  API arranca y responde /health                           ║
 ║  □  BD MySQL tiene todas las tablas con índices              ║
 ║  □  Android compila APK debug vacío                          ║
-║  □  Web compila y sirve página vacía                         ║
+║  □  Web compila y sirve página con paleta dorado/carbón      ║
+║     visible (NO blanco y negro)                              ║
 ║  □  Git: primer commit con toda la estructura                ║
 ╚═══════════════════════════════════════════════════════════════╝
 ```
@@ -140,7 +159,8 @@ FASE 3 — Deploy (VPS API + VPS Web + APK Release)
 **Validar:**
 
 - [ ] `pnpm --filter api exec prisma db seed` crea el usuario admin
-- [ ] `curl POST /auth/login` con credenciales correctas retorna `{token, user}`
+- [ ] `curl POST /auth/login` con credenciales correctas retorna `{token, user, empresa, sucursales}`
+- [ ] El JWT decodificado contiene `empresa_id` y `sucursal_id` (null para admin)
 - [ ] `curl POST /auth/login` con credenciales incorrectas retorna 401
 - [ ] `curl GET /productos` sin token retorna 401
 - [ ] `curl GET /productos` con token retorna 200 (array vacío por ahora)
@@ -421,10 +441,13 @@ FASE 3 — Deploy (VPS API + VPS Web + APK Release)
 ║  FASE 2A COMPLETADA cuando:                                 ║
 ║                                                              ║
 ║  □  7 endpoints de compras/proveedores operativos            ║
+║  □  4 endpoints de sucursales operativos (CRUD)              ║
 ║  □  6 endpoints de reportes operativos                       ║
 ║  □  Compras incrementan existencias en transacción           ║
 ║  □  Dashboard retorna KPIs correctos                         ║
 ║  □  Todos probados con curl con datos reales                 ║
+║  □  AISLAMIENTO probado con 2 empresas × 2 sucursales:       ║
+║     checklist sección 6 de multitenancy-empresa-sucursal     ║
 ║  □  DOD de API secciones 2.2-2.4 cumplen                    ║
 ╚═══════════════════════════════════════════════════════════════╝
 ```
@@ -603,6 +626,13 @@ El siguiente diagrama muestra qué skill depende de cuál. **Nunca ejecutar una 
 SKILL-01 (monorepo-setup)
     │
     ├── SKILL-02 (shared-types)
+    │
+    ├── SKILL-00D (design-system) ← fuente única de la paleta de marca
+    │       │ (requerido por SKILL-10, SKILL-16, SKILL-21, SKILL-26)
+    │
+    ├── SKILL-00M (multitenancy-empresa-sucursal) ← fuente única del modelo
+    │       │ empresa/sucursal (requerido por SKILL-04, 05, 07, 08, 09,
+    │       │ 11, 19, 22, 23, 30 — gana sobre todas donde se contradigan)
     │
     ├── SKILL-03 (fastify-project-structure)
     │       │

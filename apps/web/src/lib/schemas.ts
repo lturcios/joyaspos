@@ -16,22 +16,34 @@ export const ingresoExistenciaSchema = z.object({
   cantidad: z.number({ message: 'Ingresa un número válido' }).positive('Debe ser mayor a 0'),
 })
 
-export const usuarioSchema = z.object({
-  username: z
-    .string()
-    .min(3, 'Mínimo 3 caracteres')
-    .max(50)
-    .regex(/^[a-zA-Z0-9_]+$/, 'Solo letras, números y guión bajo'),
-  password: z.string().min(6, 'Mínimo 6 caracteres'),
-  nombre_completo: z.string().min(1, 'El nombre es requerido').max(100),
-  rol: z.nativeEnum(Rol),
-})
+export const usuarioSchema = z
+  .object({
+    username: z
+      .string()
+      .min(3, 'Mínimo 3 caracteres')
+      .max(50)
+      .regex(/^[a-zA-Z0-9_]+$/, 'Solo letras, números y guión bajo'),
+    password: z.string().min(6, 'Mínimo 6 caracteres'),
+    nombre_completo: z.string().min(1, 'El nombre es requerido').max(100),
+    rol: z.nativeEnum(Rol),
+    sucursal_id: z.number().optional(),
+  })
+  .refine((d) => d.rol !== Rol.VENDEDOR || d.sucursal_id !== undefined, {
+    message: 'La sucursal es requerida para vendedores',
+    path: ['sucursal_id'],
+  })
 
-export const editUsuarioSchema = z.object({
-  nombre_completo: z.string().min(1).max(100),
-  rol: z.nativeEnum(Rol),
-  activo: z.boolean(),
-})
+export const editUsuarioSchema = z
+  .object({
+    nombre_completo: z.string().min(1).max(100),
+    rol: z.nativeEnum(Rol),
+    activo: z.boolean(),
+    sucursal_id: z.number().optional(),
+  })
+  .refine((d) => d.rol !== Rol.VENDEDOR || d.sucursal_id !== undefined, {
+    message: 'La sucursal es requerida para vendedores',
+    path: ['sucursal_id'],
+  })
 
 export const changePasswordSchema = z
   .object({
@@ -50,6 +62,12 @@ export const proveedorSchema = z.object({
   direccion: z.string().max(255).optional(),
 })
 
+export const sucursalSchema = z.object({
+  nombre: z.string().min(1, 'El nombre es requerido').max(150),
+  direccion: z.string().max(255).optional(),
+  telefono: z.string().max(20).optional(),
+})
+
 export type LoginFormValues = z.infer<typeof loginSchema>
 export type ProductoFormValues = z.infer<typeof productoSchema>
 export type IngresoExistenciaValues = z.infer<typeof ingresoExistenciaSchema>
@@ -57,3 +75,4 @@ export type UsuarioFormValues = z.infer<typeof usuarioSchema>
 export type EditUsuarioFormValues = z.infer<typeof editUsuarioSchema>
 export type ChangePasswordValues = z.infer<typeof changePasswordSchema>
 export type ProveedorFormValues = z.infer<typeof proveedorSchema>
+export type SucursalFormValues = z.infer<typeof sucursalSchema>

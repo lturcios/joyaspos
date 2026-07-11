@@ -2,7 +2,7 @@ import { NavLink } from 'react-router-dom'
 import { useAuthStore } from '@/stores/authStore'
 import {
   LayoutDashboard, ShoppingCart, Package, Truck,
-  BarChart3, Boxes, Users, LogOut,
+  BarChart3, Boxes, Users, LogOut, Store,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -15,6 +15,7 @@ const navItems = [
   { to: '/reportes/ventas', label: 'Reportes', icon: BarChart3, adminOnly: true },
   { to: '/existencias', label: 'Existencias', icon: Boxes, adminOnly: true },
   { to: '/usuarios', label: 'Usuarios', icon: Users, adminOnly: true },
+  { to: '/sucursales', label: 'Sucursales', icon: Store, adminOnly: true },
 ]
 
 interface SidebarProps {

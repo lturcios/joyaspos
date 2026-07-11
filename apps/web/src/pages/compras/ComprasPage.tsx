@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Plus } from 'lucide-react'
 import { useCompras } from '@/hooks/useCompras'
+import { useAuthStore } from '@/stores/authStore'
 import { calcularPeriodo } from '@/lib/periodos'
 import { PeriodFilter } from '@/components/shared/PeriodFilter'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
@@ -17,6 +18,9 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import type { CompraResumen } from '@joyaspos/shared-types'
+
+type CompraResumenWithSucursal = CompraResumen & { sucursal_nombre?: string }
 
 type Periodo = 'hoy' | 'esta_semana' | 'esta_quincena' | 'este_mes' | 'personalizado'
 
@@ -30,8 +34,12 @@ export default function ComprasPage() {
   const [customHasta, setCustomHasta] = useState('')
   const [selectedId, setSelectedId] = useState<number | null>(null)
 
+  const sucursalId = useAuthStore((s) => s.sucursalActiva)
+  const mostrarSucursal = sucursalId === null
+
   const rango = calcularPeriodo(periodo, { desde: customDesde, hasta: customHasta })
-  const { data: compras, isLoading, isError, refetch } = useCompras(rango)
+  const { data, isLoading, isError, refetch } = useCompras(rango)
+  const compras = data as CompraResumenWithSucursal[] | undefined
 
   const total = compras?.reduce((sum, c) => sum + c.monto_total, 0) ?? 0
 
@@ -39,7 +47,11 @@ export default function ComprasPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Compras</h1>
-        <Button onClick={() => navigate('/compras/nueva')}>
+        <Button
+          onClick={() => navigate('/compras/nueva')}
+          disabled={sucursalId === null}
+          title={sucursalId === null ? 'Selecciona una sucursal para crear registros' : undefined}
+        >
           <Plus className="mr-2 h-4 w-4" />
           Nueva compra
         </Button>
@@ -66,7 +78,7 @@ export default function ComprasPage() {
             <span>Total: <strong className="text-foreground">{fmt(total)}</strong></span>
           </div>
 
-          {/* Tabla — md+ */}
+          {/* Table — md+ */}
           <div className="hidden md:block rounded-md border">
             <Table>
               <TableHeader>
@@ -75,6 +87,7 @@ export default function ComprasPage() {
                   <TableHead>Proveedor</TableHead>
                   <TableHead className="text-right">Total</TableHead>
                   <TableHead>Registrado por</TableHead>
+                  {mostrarSucursal && <TableHead>Sucursal</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -88,6 +101,7 @@ export default function ComprasPage() {
                     <TableCell>{c.proveedor_nombre}</TableCell>
                     <TableCell className="text-right font-medium">{fmt(c.monto_total)}</TableCell>
                     <TableCell>{c.registrado_por}</TableCell>
+                    {mostrarSucursal && <TableCell>{c.sucursal_nombre ?? '—'}</TableCell>}
                   </TableRow>
                 ))}
               </TableBody>
@@ -110,6 +124,9 @@ export default function ComprasPage() {
                   {c.proveedor_nombre || <span className="text-muted-foreground">Sin proveedor</span>}
                 </p>
                 <p className="text-xs text-muted-foreground mt-0.5">Por: {c.registrado_por}</p>
+                {mostrarSucursal && c.sucursal_nombre && (
+                  <p className="text-xs text-muted-foreground mt-0.5">Sucursal: {c.sucursal_nombre}</p>
+                )}
               </div>
             ))}
           </div>

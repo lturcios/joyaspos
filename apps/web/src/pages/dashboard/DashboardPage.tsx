@@ -1,4 +1,5 @@
 import { useDashboard } from '@/hooks/useReportes'
+import { useAuthStore } from '@/stores/authStore'
 import { KpiCard } from '@/components/shared/KpiCard'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 import { ErrorState } from '@/components/shared/ErrorState'
@@ -15,13 +16,19 @@ import {
 
 export default function DashboardPage() {
   const { data, isLoading, isError, refetch } = useDashboard()
+  const sucursales = useAuthStore((s) => s.sucursales)
+  const sucursalId = useAuthStore((s) => s.sucursalActiva)
+
+  const sucursalLabel = sucursalId !== null
+    ? (sucursales.find((s) => s.id === sucursalId)?.nombre ?? String(sucursalId))
+    : 'Todas las sucursales'
 
   if (isLoading) return <LoadingSpinner />
   if (isError || !data) return <ErrorState message="Error al cargar el dashboard" onRetry={refetch} />
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold">Dashboard</h1>
+      <h1 className="text-2xl font-bold">Dashboard — {sucursalLabel}</h1>
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <KpiCard

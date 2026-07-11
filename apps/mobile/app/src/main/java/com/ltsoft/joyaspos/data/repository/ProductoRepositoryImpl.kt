@@ -29,14 +29,14 @@ class ProductoRepositoryImpl @Inject constructor(
 
     override fun getProductos(): Flow<List<ProductoEntity>> = productoDao.getTodos()
 
-    override suspend fun syncProductos(force: Boolean): Boolean {
+    override suspend fun syncProductos(force: Boolean, sucursalId: Long?): Boolean {
         if (!force && sincronizadoEstaSesion) {
             Log.d(TAG, "Productos ya sincronizados esta sesión, omitiendo.")
             return true
         }
         sincronizadoEstaSesion = true
         return try {
-            val response = apiService.getProductos()
+            val response = apiService.getProductos(sucursalId = sucursalId)
             if (response.isSuccessful) {
                 val productos = response.body() ?: emptyList()
                 val entities = productos.map { dto ->

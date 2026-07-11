@@ -268,3 +268,30 @@ pnpm turbo build                                       # build total
 | HISTORIAS_USUARIO.md | 28 HUs con CA y SP (117 SP total) |
 | CASOS_DE_USO.md | 9 CUs con flujos principales y alternativos; matriz actores |
 | DOD.md | DoD por componente; checklist rapido; criterios especificos offline/sync/impresion |
+
+---
+
+## REGLAS DE MULTITENANCY (empresa + sucursal) — NO NEGOCIABLES
+
+> Fuente completa: `skills/multitenancy-empresa-sucursal/SKILL.md`. Estas reglas
+> aplican a TODO el código del proyecto y prevalecen sobre cualquier ejemplo
+> anterior que no incluya `empresa_id`/`sucursal_id`.
+
+1. **Modelo:** una EMPRESA tiene N SUCURSALES. El admin pertenece a la empresa
+   (sucursal_id NULL) y administra todas sus sucursales. Vendedores, productos,
+   proveedores, ventas y compras pertenecen a UNA sucursal. Cada sucursal
+   gestiona su propio catálogo — NO existe traslado de productos entre sucursales.
+2. **Jamás un query de datos operativos sin scope de sucursal/empresa.** Todo
+   `findMany`, `findFirst`, `aggregate` y `$queryRaw` sobre productos, proveedores,
+   ventas o compras filtra por `sucursal_id` o por las sucursales de la empresa.
+3. **El vendedor NUNCA elige sucursal** — se deriva del JWT. Cualquier
+   `sucursal_id` enviado por un cliente con rol vendedor se ignora.
+4. **El admin escribe sobre una sucursal explícita** (validada contra su
+   empresa_id) y puede leer en consolidado (sin sucursal = toda su empresa).
+5. **JWT payload:** `{sub, username, rol, empresa_id, sucursal_id}`.
+6. **404 indistinguibles:** acceder a un recurso de otra empresa retorna el
+   mismo 404 que un recurso inexistente — nunca revelar su existencia.
+7. **Android:** si inicia sesión un vendedor de otra sucursal en el mismo
+   dispositivo, limpiar Room; BLOQUEAR el cambio si hay ventas sin sincronizar.
+8. **Web:** `sucursalActiva` del authStore entra en todas las queryKeys y
+   params; las mutaciones de creación se deshabilitan en vista consolidada.

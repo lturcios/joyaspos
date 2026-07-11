@@ -16,6 +16,7 @@ data class CreateVentaRequest(
     @Json(name = "nombre_cliente") val nombreCliente: String?,
     @Json(name = "fecha_hora") val fechaHora: String?,
     val items: List<VentaItemRequest>,
+    @Json(name = "sucursal_id") val sucursalId: Long? = null,
 )
 
 @JsonClass(generateAdapter = true)
@@ -24,6 +25,7 @@ data class VentaSyncPayload(
     @Json(name = "nombre_cliente") val nombreCliente: String?,
     @Json(name = "fecha_hora") val fechaHora: String?,
     val items: List<VentaItemRequest>,
+    @Json(name = "sucursal_id") val sucursalId: Long? = null,
 )
 
 @JsonClass(generateAdapter = true)

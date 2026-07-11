@@ -33,11 +33,17 @@ fun SalesQueryScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val selectedPeriodo by viewModel.selectedPeriodo.collectAsStateWithLifecycle()
+    val esAdmin by viewModel.esAdmin.collectAsStateWithLifecycle()
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Historial de ventas", style = MaterialTheme.typography.titleLarge) },
+                title = {
+                    Text(
+                        if (esAdmin) "Historial de ventas" else "Ventas de hoy",
+                        style = MaterialTheme.typography.titleLarge,
+                    )
+                },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Volver")
@@ -57,10 +63,12 @@ fun SalesQueryScreen(
         },
     ) { padding ->
         Column(modifier = Modifier.padding(padding)) {
-            PeriodoSelector(
-                selectedKey = selectedPeriodo,
-                onPeriodoSelected = viewModel::onPeriodoSelected,
-            )
+            if (esAdmin) {
+                PeriodoSelector(
+                    selectedKey = selectedPeriodo,
+                    onPeriodoSelected = viewModel::onPeriodoSelected,
+                )
+            }
 
             when (val state = uiState) {
                 is SalesQueryUiState.Loading -> LoadingState()

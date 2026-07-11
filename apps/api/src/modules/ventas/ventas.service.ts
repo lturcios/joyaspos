@@ -19,7 +19,8 @@ type TxClient = Omit<
 export async function registrarVenta(
   prisma: PrismaClient,
   body: CreateVentaInput,
-  user: JwtPayload
+  user: JwtPayload,
+  sucursalId: number
 ) {
   return prisma.$transaction(async (tx: TxClient) => {
     const productoIds = body.items.map((i) => i.producto_id)
@@ -37,6 +38,7 @@ export async function registrarVenta(
 
     const venta = await tx.venta.create({
       data: {
+        sucursal_id: sucursalId,
         nombre_cliente: body.nombre_cliente ?? 'Clientes Varios',
         monto_total: new Decimal(montoTotal.toFixed(2)),
         fecha_hora: body.fecha_hora ? toDateTime(body.fecha_hora) : new Date(),
@@ -84,13 +86,14 @@ type SyncResult =
 export async function syncVentas(
   prisma: PrismaClient,
   ventas: VentaSyncPayload[],
-  user: JwtPayload
+  user: JwtPayload,
+  sucursalId: number
 ): Promise<SyncResult[]> {
   const results: SyncResult[] = []
 
   for (const payload of ventas) {
     try {
-      const { venta } = await registrarVenta(prisma, payload, user)
+      const { venta } = await registrarVenta(prisma, payload, user, sucursalId)
       results.push({ local_id: payload.local_id, remote_id: venta.id, ok: true })
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Error desconocido'

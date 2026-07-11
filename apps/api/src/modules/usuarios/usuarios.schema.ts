@@ -11,6 +11,8 @@ export const createUsuarioSchema = z.object({
   password: z.string().min(6, 'La contraseña debe tener al menos 6 caracteres'),
   nombre_completo: z.string().min(1).max(100),
   rol: rolEnum,
+  // required when rol === 'vendedor', validated in handler
+  sucursal_id: z.number().int().positive().optional(),
 })
 
 export const updateUsuarioSchema = z
@@ -18,6 +20,7 @@ export const updateUsuarioSchema = z
     nombre_completo: z.string().min(1).max(100).optional(),
     rol: rolEnum.optional(),
     activo: z.boolean().optional(),
+    sucursal_id: z.number().int().positive().nullable().optional(),
   })
   .refine(
     (data) => Object.values(data).some((v) => v !== undefined),

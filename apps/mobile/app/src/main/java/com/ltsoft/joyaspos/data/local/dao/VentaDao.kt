@@ -46,6 +46,9 @@ interface VentaDao {
     """)
     suspend fun marcarSincronizado(localId: Long, remoteId: Long)
 
+    @Query("SELECT COUNT(*) FROM ventas WHERE sincronizado = 0")
+    suspend fun countPendientesOnce(): Int
+
     @Update
     suspend fun update(venta: VentaEntity)
 }
